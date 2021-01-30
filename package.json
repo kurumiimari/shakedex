@@ -1,0 +1,36 @@
+{
+  "name": "shakedex",
+  "version": "1.0.0",
+  "description": "",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "mocha"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kurumiimari/shakedex.git"
+  },
+  "author": "Kurumi Imari",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/kurumiimari/shakedex/issues"
+  },
+  "homepage": "https://github.com/kurumiimari/shakedex#readme",
+  "dependencies": {
+    "bcrypto": "5.4.0",
+    "chai-as-promised": "7.1.1",
+    "cli-table": "^0.3.4",
+    "commander": "7.0.0",
+    "date-fns": "2.17.0",
+    "hs-client": "0.0.9",
+    "hsd": "^2.3.0",
+    "inquirer": "7.3.3",
+    "level": "6.0.1",
+    "node-fetch": "2.6.1",
+    "password-prompt": "1.1.2"
+  },
+  "devDependencies": {
+    "chai": "4.2.0",
+    "mocha": "8.2.1"
+  }
+}
