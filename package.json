@@ -1,8 +1,11 @@
 {
   "name": "shakedex",
-  "version": "1.0.0",
-  "description": "",
-  "main": "src/index.js",
+  "version": "0.0.1",
+  "description": "A decentralized exchange for Handshake names.",
+  "main": "src/cli/index.js",
+  "bin": {
+    "shakedex": "./bin/shakedex"
+  },
   "scripts": {
     "test": "mocha"
   },
