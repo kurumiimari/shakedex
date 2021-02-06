@@ -125,3 +125,7 @@ Yes, you can. Once the transfer has been `FINALIZE`d, the name can be managed us
 1. The project should function both as a CLI tool and as a library.
 2. The library should use Handshake's RPC/REST API rather than direct wallet/node DB access.
 3. Minimize the amount of state stored on disk.
+
+## Development Status
+
+Alpha Software That Works On My Machine 💫
