@@ -12,7 +12,7 @@ describe('script.js', () => {
       const lockScript = createLockScript(Buffer.from(address.publicKey, 'hex'));
       assert.equal(
         lockScript.toString(),
-        `OP_TYPE OP_7 OP_EQUAL OP_IF OP_RETURN OP_ENDIF OP_TYPE OP_11 OP_EQUAL OP_IF OP_RETURN OP_ENDIF OP_TYPE OP_8 OP_EQUAL OP_IF OP_RETURN OP_ENDIF OP_TYPE OP_9 OP_EQUAL OP_IF 0x21 0x${address.publicKey} OP_CHECKSIGVERIFY OP_ENDIF OP_1`,
+        `OP_TYPE OP_9 OP_EQUAL OP_IF 0x21 0x${address.publicKey} OP_CHECKSIG OP_ELSE OP_TYPE OP_10 OP_EQUAL OP_ENDIF`,
       );
     });
   });

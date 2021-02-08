@@ -131,7 +131,7 @@ describe('finalizeNameLock', () => {
 
     assert.throws(() => {
       mtx.checkInput(0, coin, ANYONECANPAY | SINGLEREVERSE);
-    }, `OP_RETURN (op=OP_RETURN, ip=${ip})`);
+    }, `EVAL_FALSE`);
   }
 
   beforeEach(async () => {

@@ -7,33 +7,16 @@ exports.createLockScript = function(
 ) {
   return new Script([
     Opcode.fromSymbol('type'),
-    Opcode.fromInt(rules.types.UPDATE),
-    Opcode.fromSymbol('equal'),
-    Opcode.fromSymbol('if'),
-    Opcode.fromSymbol('return'),
-    Opcode.fromSymbol('endif'),
-
-    Opcode.fromSymbol('type'),
-    Opcode.fromInt(rules.types.REVOKE),
-    Opcode.fromSymbol('equal'),
-    Opcode.fromSymbol('if'),
-    Opcode.fromSymbol('return'),
-    Opcode.fromSymbol('endif'),
-
-    Opcode.fromSymbol('type'),
-    Opcode.fromInt(rules.types.RENEW),
-    Opcode.fromSymbol('equal'),
-    Opcode.fromSymbol('if'),
-    Opcode.fromSymbol('return'),
-    Opcode.fromSymbol('endif'),
-
-    Opcode.fromSymbol('type'),
     Opcode.fromInt(rules.types.TRANSFER),
     Opcode.fromSymbol('equal'),
+
     Opcode.fromSymbol('if'),
-    Opcode.fromPush(pubKey),
-    Opcode.fromSymbol('checksigverify'),
-    Opcode.fromSymbol('endif'),
-    Opcode.fromInt(1),
+      Opcode.fromPush(pubKey),
+      Opcode.fromSymbol('checksig'),
+    Opcode.fromSymbol('else'),
+      Opcode.fromSymbol('type'),
+      Opcode.fromInt(rules.types.FINALIZE),
+      Opcode.fromSymbol('equal'),
+    Opcode.fromSymbol('endif')
   ]);
 }
