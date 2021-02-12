@@ -1,3 +1,5 @@
+[![CircleCI](https://circleci.com/gh/kurumiimari/shakedex.svg?style=svg)](https://circleci.com/gh/kurumiimari/shakedex)
+
 # 🤝💰 shakedex 💰🤝
 
 A decentralized exchange for Handshake names.
