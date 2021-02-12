@@ -8,6 +8,8 @@ const Witness = require('hsd/lib/script/witness.js');
 const {createLockScript} = require('./script.js');
 const common = require('hsd/lib/script/common.js');
 const {fundMtx, createRings} = require('./utils.js');
+const readline = require('readline');
+const fs = require('fs');
 
 const assert = assertModule.strict;
 const {SINGLEREVERSE, ANYONECANPAY, ALL} = common.hashType;
@@ -170,3 +172,97 @@ class SwapProof {
 }
 
 exports.SwapProof = SwapProof;
+
+const VALID_PROOF_MAGIC = 'SHAKEDEX_PROOF';
+
+async function writeProofFile(outPath, proofs, context) {
+  const first = proofs[0].toJSON(context);
+  const outProof = {
+    name: first.name,
+    lockingTxHash: first.lockingTxHash,
+    lockingOutputIdx: first.lockingOutputIdx,
+    publicKey: first.publicKey,
+    paymentAddr: first.paymentAddr,
+    data: [{
+      price: first.price,
+      lockTime: first.lockTime,
+      signature: first.signature,
+    }],
+  };
+  for (let i = 1; i < proofs.length; i++) {
+    const proof = proofs[i].toJSON(context);
+    outProof.data.push({
+      price: proof.price,
+      lockTime: proof.lockTime,
+      signature: proof.signature,
+    });
+  }
+  const fd = await fs.promises.open(outPath, 'w');
+  await fd.write(`${VALID_PROOF_MAGIC}:1.0.0\n`);
+  await fd.write(JSON.stringify(outProof));
+  await fd.close();
+}
+
+exports.writeProofFile = writeProofFile;
+
+async function readProofFile(proofFile) {
+  const input = fs.createReadStream(proofFile);
+  const rl = readline.createInterface({
+    input,
+  });
+  const proofLines = [];
+  for await (const line of rl) {
+    proofLines.push(line);
+  }
+  await rl.close();
+
+  const firstLine = proofLines[0].trim();
+  if (!firstLine.startsWith(VALID_PROOF_MAGIC)) {
+    return readProofFile_Unversioned(rl);
+  }
+
+  const proofJSON = JSON.parse(proofLines.slice(1).join('\n'));
+  const splits = firstLine.split(':');
+  switch (splits[1]) {
+    case '1.0.0':
+      return readProofFile1_0_0(proofJSON);
+    default:
+      throw new Error('Invalid proof file version.');
+  }
+}
+
+exports.readProofFile = readProofFile;
+
+async function readProofFile_Unversioned(rl) {
+  let lastName = null;
+  const proofs = [];
+  for await (const line of rl) {
+    const data = JSON.parse(line.trim());
+    if (!lastName) {
+      lastName = data.name;
+    }
+    if (data.name !== lastName) {
+      throw new Error('Proof file cannot contain multiple names.');
+    }
+    proofs.push(new SwapProof(data));
+  }
+  return proofs;
+}
+
+async function readProofFile1_0_0(proofJSON) {
+  const {name, lockingTxHash, lockingOutputIdx, publicKey, paymentAddr} = proofJSON;
+  const proofs = [];
+  for (const datum of proofJSON.data) {
+    proofs.push(new SwapProof({
+      name,
+      lockingTxHash,
+      lockingOutputIdx,
+      publicKey,
+      paymentAddr,
+      price: datum.price,
+      lockTime: datum.lockTime,
+      signature: datum.signature,
+    }));
+  }
+  return proofs;
+}

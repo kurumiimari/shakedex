@@ -14,6 +14,8 @@ const {putAuction} = require('../storage.js');
 const {linearReductionStrategy} = require('../auction.js');
 const {Auction} = require('../auction.js');
 const readline = require('readline');
+const {readProofFile} = require('../swapProof.js');
+const {writeProofFile} = require('../swapProof.js');
 const {putSwapFinalize} = require('../storage.js');
 const {finalizeSwap} = require('../swapService.js');
 const {formatDate} = require('../conversions.js');
@@ -238,13 +240,7 @@ async function createAuction(name) {
     reductionStrategy: linearReductionStrategy,
   });
   const proposals = await auction.generateProposals(context, nameObj.finalize);
-  const fd = await fs.promises.open(outPath, 'w');
-  for (const proposal of proposals) {
-    await fd.write(JSON.stringify(proposal.toJSON(context)));
-    await fd.write('\n');
-  }
-  await fd.close();
-  await putAuction(db, auction);
+  await writeProofFile(outPath, proposals, context);
 }
 
 async function listAuctions() {
@@ -336,30 +332,18 @@ async function fulfillAuction(proposalsPath) {
 
   const db = await createDB(program.opts().prefix);
   const context = getContext();
-  const rl = readline.createInterface({
-    input: fs.createReadStream(proposalsPath),
-  });
+  const proofs = await readProofFile(proposalsPath);
 
   log('Verifying swap proofs.');
-  let i = -1;
-  const proofs = [];
-  for await (const line of rl) {
-    i++;
-
-    const trimmed = line.trim();
-    if (!trimmed.length) {
-      continue;
-    }
-
+  for (let i = 0; i < proofs.length; i++) {
+    const proof = proofs[i];
     process.stdout.clearLine();
     process.stdout.cursorTo(0);
-    process.stdout.write(`>> Verified proof ${proofs.length + 1}.`);
+    process.stdout.write(`>> Verified proof ${i + 1}.`);
 
-    const swapProof = new SwapProof(JSON.parse(trimmed));
-    if (!await swapProof.verify(context)) {
-      die(`Swap proof on line ${i} is invalid - aborting.`);
+    if (!await proof.verify(context)) {
+      die(`Swap proof ${i + 1} is invalid - aborting.`);
     }
-    proofs.push(swapProof);
   }
   process.stdout.clearLine();
   process.stdout.cursorTo(0);
