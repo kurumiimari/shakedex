@@ -54,9 +54,10 @@ exports.proposeSwap = async function (
   lockFinalize,
   price,
   lockTime = 0,
+  paymentAddr = null,
 ) {
   const {wallet} = context;
-  const paymentAddr = (await wallet.createAddress('default')).address;
+  paymentAddr = paymentAddr || (await wallet.createAddress('default')).address;
   const swapProof = new SwapProof({
     lockingTxHash: lockFinalize.finalizeTxHash,
     lockingOutputIdx: lockFinalize.finalizeOutputIdx,

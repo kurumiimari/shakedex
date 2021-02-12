@@ -78,6 +78,7 @@ class Auction {
     const strategy = this.strategy();
 
     const out = [];
+    const paymentAddr = (await context.wallet.createAddress('default')).address;
     let info = strategy();
     while (info) {
       out.push(await proposeSwap(
@@ -85,6 +86,7 @@ class Auction {
         lockFinalize,
         info.price,
         info.lockTime,
+        paymentAddr,
       ));
       info = strategy();
     }
