@@ -26,9 +26,11 @@ To install shakedex:
 npm i -g shakedex
 ```
 
-For shakedex to work, you'll need a Handshake node running somewhere. You can use [Bob Wallet](https://github.com/kyokan/bob-wallet) (just remember to set your API key), or run [hsd](https://github.com/handshake-org/hsd) in a background process.
+For shakedex to work, you'll need a Handshake node running somewhere. You can use [Bob Wallet](https://github.com/kyokan/bob-wallet) (just remember to set your API key), or run [hsd](https://github.com/handshake-org/hsd) in a background process. Make sure to start your HSD node with `--index-tx`.
 
 ## Usage
+
+> **⚠️ Warning:** Shakedex generates its own public/private keys to sign/redeem auction presigns. These keys are stored in `~/.shakedex`. Remember to back up this folder - without it, you risk losing funds.
 
 `shakedex` has a command line interface. CLI usage is documented by running `shakedex --help`.
 
