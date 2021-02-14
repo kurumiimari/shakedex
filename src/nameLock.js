@@ -43,7 +43,7 @@ class NameLockTransfer {
     return {
       confirmedAt: included ? tx.mtime * 1000 : null,
       spendable: included ? info.blocks - tx.height > transferLockup : null,
-      spendableIn: included ? Math.max(transferLockup - (info.blocks - tx.height), 0) : null
+      spendableIn: included ? Math.max(transferLockup - (info.blocks - tx.height), 0) : null,
     };
   }
 
@@ -85,10 +85,12 @@ class NameLockFinalize {
   }
 
   async getConfirmationDetails(context) {
-    const tx = await context.nodeClient.getTX(this.finalizeTxHash);
-    const included = tx.height > -1;
+    const coin = await context.nodeClient.getCoin(
+      this.finalizeTxHash,
+      this.finalizeOutputIdx,
+    );
     return {
-      confirmedAt: included ? tx.mtime * 1000 : null,
+      confirmedAt: coin && coin.height > -1 ? coin.mtime * 1000 : null,
     };
   }
 
