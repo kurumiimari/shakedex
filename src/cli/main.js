@@ -22,14 +22,15 @@ const {formatDate} = require('../conversions.js');
 const {putSwapFulfillment} = require('../storage.js');
 const {fulfillSwap} = require('../swapService.js');
 const {SwapProof} = require('../swapProof.js');
-
+const {Client} = require('bcurl');
 
 program
   .version(pkg.version)
   .option('-p, --prefix <prefix>', 'Prefix directory to write the database to.', `${process.env.HOME}/.shakedex`)
   .option('-n, --network <network>', 'Handshake network to connect to.', 'regtest')
   .option('-w, --wallet-id <walletId>', 'Handshake wallet ID.', 'primary')
-  .option('-a, --api-key <apiKey>', 'Handshake wallet API key.');
+  .option('-a, --api-key <apiKey>', 'Handshake wallet API key.')
+  .option('--shakedex-web-host <shakedexWebHost>', 'Shakedex web hostname.', 'www.shakedex.com');
 
 program.command('transfer-lock <name>')
   .description('Posts a name lock transaction, which when finalized allows the name to be auctioned.')
@@ -148,6 +149,7 @@ async function finalizeLock(name) {
 
 async function createAuction(name) {
   const db = await createDB(program.opts().prefix);
+  const shakedexWebHost = program.opts().shakedexWebHost;
   const context = getContext();
   const nameObj = await getName(db, name);
 
@@ -241,6 +243,47 @@ async function createAuction(name) {
   });
   const proposals = await auction.generateProposals(context, nameObj.finalize);
   await writeProofFile(outPath, proposals, context);
+
+  const shouldPostAnswer = await inquirer.prompt([{
+    type: 'confirm',
+    name: 'shouldPost',
+    message: `Would you like to publish your auction to Shakedex Web at ${shakedexWebHost}?`,
+    default: true,
+  }]);
+
+  if (shouldPostAnswer.shouldPost) {
+    const client = new Client({
+      host: shakedexWebHost,
+      ssl: true,
+    });
+    const first = proposals[0];
+    const auction = {
+      name: first.name,
+      lockingTxHash: first.lockingTxHash.toString('hex'),
+      lockingOutputIdx: first.lockingOutputIdx,
+      publicKey: first.publicKey.toString('hex'),
+      paymentAddr: first.paymentAddr.toString(context.networkName),
+      data: proposals.map(p => ({
+        price: p.price,
+        lockTime: p.lockTime,
+        signature: p.signature.toString('hex'),
+      })),
+    };
+    try {
+      await client.post('api/v1/auctions', {
+        auction
+      });
+    } catch (e) {
+      log('An error occurred posting your proof to Shakedex Web:')
+      log(e.message);
+      log(e.stack);
+      log(`You can still find your proof in ${outPath}.`)
+
+      if (e.json) {
+
+      }
+    }
+  }
 }
 
 async function listAuctions() {

@@ -1,6 +1,6 @@
 {
   "name": "shakedex",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "A decentralized exchange for Handshake names.",
   "main": "src/cli/index.js",
   "bin": {
@@ -21,6 +21,7 @@
   "homepage": "https://github.com/kurumiimari/shakedex#readme",
   "dependencies": {
     "bcrypto": "5.4.0",
+    "bcurl": "^0.1.9",
     "chai-as-promised": "7.1.1",
     "cli-table3": "0.6.0",
     "commander": "7.0.0",
