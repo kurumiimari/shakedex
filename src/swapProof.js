@@ -175,7 +175,7 @@ exports.SwapProof = SwapProof;
 
 const VALID_PROOF_MAGIC = 'SHAKEDEX_PROOF';
 
-async function writeProofFile(outPath, proofs, context) {
+async function writeProofStream(stream, proofs, context) {
   const first = proofs[0].toJSON(context);
   const outProof = {
     name: first.name,
@@ -197,10 +197,31 @@ async function writeProofFile(outPath, proofs, context) {
       signature: proof.signature,
     });
   }
-  const fd = await fs.promises.open(outPath, 'w');
-  await fd.write(`${VALID_PROOF_MAGIC}:1.0.0\n`);
-  await fd.write(JSON.stringify(outProof));
-  await fd.close();
+  await new Promise((resolve, reject) => stream.write(`${VALID_PROOF_MAGIC}:1.0.0\n`, (err) => {
+    if (err) {
+      return reject(err);
+    }
+    resolve();
+  }));
+  await new Promise((resolve, reject) => stream.write(JSON.stringify(outProof), (err) => {
+    if (err) {
+      return reject(err);
+    }
+    resolve();
+  }));
+}
+
+exports.writeProofStream = writeProofStream;
+
+async function writeProofFile(outPath, proofs, context) {
+  const stream = fs.createWriteStream(outPath);
+  await writeProofStream(stream, proofs, context);
+  await new Promise((resolve, reject) => stream.close((err) => {
+    if (err) {
+      return reject(err);
+    }
+    resolve();
+  }));
 }
 
 exports.writeProofFile = writeProofFile;
