@@ -62,7 +62,9 @@ This will output a file containing a set of newline-delimited JSONs. These JSONS
 
 **4. Distribute Presigns**
 
-Upload the presigns file wherever presign files are found.
+The CLI will offer to upload your presigns to [ShakeDex Web](https://www.shakedex.com), a website that displays Shakedex swap proofs.
+
+You can also opload the presigns file wherever presign files are found.
 
 ### Buying a Name
 
