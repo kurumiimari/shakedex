@@ -1,4 +1,5 @@
 [![CircleCI](https://circleci.com/gh/kurumiimari/shakedex.svg?style=svg)](https://circleci.com/gh/kurumiimari/shakedex)
+[![Discord](https://img.shields.io/discord/812809443326558217)](https://discord.gg/sDVEEsvjTJ)
 
 # 🤝💰 shakedex 💰🤝
 
