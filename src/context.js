@@ -8,16 +8,19 @@ class Context {
     walletId,
     apiKey,
     passphraseGetter = noopPassphraseGetter,
+    host = '127.0.0.1',
   ) {
     this.networkName = networkName;
     this.network = Network.get(networkName);
     this.walletId = walletId;
     this.nodeClient = new NodeClient({
       port: this.network.rpcPort,
+      host,
       apiKey,
     });
     this.walletClient = new WalletClient({
       port: this.network.walletPort,
+      host,
       apiKey,
     });
     this.wallet = this.walletClient.wallet(walletId);
