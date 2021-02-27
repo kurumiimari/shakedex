@@ -1,4 +1,4 @@
-const {NodeClient, WalletClient} = require('hs-client');
+const { NodeClient, WalletClient } = require('hs-client');
 const Network = require('hsd/lib/protocol/network.js');
 const passwordPrompt = require('password-prompt');
 
@@ -8,7 +8,7 @@ class Context {
     walletId,
     apiKey,
     passphraseGetter = noopPassphraseGetter,
-    host = '127.0.0.1',
+    host = '127.0.0.1'
   ) {
     this.networkName = networkName;
     this.network = Network.get(networkName);
@@ -44,13 +44,15 @@ class Context {
 exports.Context = Context;
 
 exports.staticPassphraseGetter = function (passphrase) {
-  return () => new Promise(resolve => resolve(passphrase));
+  return () => new Promise((resolve) => resolve(passphrase));
 };
 
 function noopPassphraseGetter() {
-  return new Promise(resolve => resolve(null));
+  return new Promise((resolve) => resolve(null));
 }
 
-exports.promptPassphraseGetter = function (prefix = '>> Please enter your passphrase: ') {
-  return () => new Promise(resolve => resolve(passwordPrompt(prefix)));
+exports.promptPassphraseGetter = function (
+  prefix = '>> Please enter your passphrase: '
+) {
+  return () => new Promise((resolve) => resolve(passwordPrompt(prefix)));
 };

@@ -1,6 +1,6 @@
 class SwapFinalize {
   constructor(options) {
-    const {name, finalizeTxHash, broadcastAt} = options;
+    const { name, finalizeTxHash, broadcastAt } = options;
 
     this.name = name;
     this.finalizeTxHash = finalizeTxHash;
