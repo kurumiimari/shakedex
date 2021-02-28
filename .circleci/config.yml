@@ -5,5 +5,5 @@ workflows:
   node-tests:
     jobs:
       - node/test
-      - node/test
+      - node/test:
           run-command: npm run format:check
