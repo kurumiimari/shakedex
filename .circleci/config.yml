@@ -6,4 +6,4 @@ workflows:
     jobs:
       - node/test
       - node/test:
-          run-command: npm run format:check
+          run-command: format:check
