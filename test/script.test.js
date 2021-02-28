@@ -9,10 +9,12 @@ describe('script.js', () => {
       const wid = `test-wallet-${Date.now()}`;
       await createWallet(wid, 'password');
       const address = await generateAddress(wid);
-      const lockScript = createLockScript(Buffer.from(address.publicKey, 'hex'));
+      const lockScript = createLockScript(
+        Buffer.from(address.publicKey, 'hex')
+      );
       assert.equal(
         lockScript.toString(),
-        `OP_TYPE OP_9 OP_EQUAL OP_IF 0x21 0x${address.publicKey} OP_CHECKSIG OP_ELSE OP_TYPE OP_10 OP_EQUAL OP_ENDIF`,
+        `OP_TYPE OP_9 OP_EQUAL OP_IF 0x21 0x${address.publicKey} OP_CHECKSIG OP_ELSE OP_TYPE OP_10 OP_EQUAL OP_ENDIF`
       );
     });
   });

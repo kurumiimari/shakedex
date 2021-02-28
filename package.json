@@ -7,7 +7,9 @@
     "shakedex": "./bin/shakedex"
   },
   "scripts": {
-    "test": "mocha"
+    "test": "mocha",
+    "format:fix": "prettier --write ./**/*.js",
+    "format:check": "prettier --check ./**/*.js"
   },
   "repository": {
     "type": "git",
@@ -35,6 +37,7 @@
   },
   "devDependencies": {
     "chai": "4.2.0",
-    "mocha": "8.2.1"
+    "mocha": "8.2.1",
+    "prettier": "2.2.1"
   }
 }

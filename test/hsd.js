@@ -1,12 +1,14 @@
-const {spawn} = require('child_process');
+const { spawn } = require('child_process');
 const path = require('path');
-const {NodeClient, WalletClient} = require('hs-client');
+const { NodeClient, WalletClient } = require('hs-client');
 const Network = require('hsd/lib/protocol/network.js');
-const {Context, staticPassphraseGetter} = require('../src/context.js');
-const {transferNameLock, finalizeNameLock} = require('../src/swapService.js');
+const { Context, staticPassphraseGetter } = require('../src/context.js');
+const { transferNameLock, finalizeNameLock } = require('../src/swapService.js');
 
 const network = Network.get('regtest');
-const hsdPath = path.resolve(path.join(__dirname, '..', 'node_modules', 'hsd', 'bin', 'hsd'));
+const hsdPath = path.resolve(
+  path.join(__dirname, '..', 'node_modules', 'hsd', 'bin', 'hsd')
+);
 
 let hsd;
 let stopAwaiter;
@@ -28,9 +30,24 @@ exports.startRegtest = async function () {
     return;
   }
 
-  hsd = spawn(hsdPath, ['--index-tx', '--network=regtest', '--api-key=test', '--log-level=debug']);
-  hsd.stdout.on('data', (data) => console.log(`[HSD STDOUT] ${data.toString().trim()}`));
-  hsd.stderr.on('data', (data) => console.log(`[HSD STDERR] ${data.toString().trim()}`));
+  hsd = spawn(hsdPath, [
+    '--index-tx',
+    '--network=regtest',
+    '--api-key=test',
+    '--log-level=debug',
+  ]);
+  hsd.stdout.on('data', (data) => {
+    if (process.env.SILENCE_HSD) {
+      return;
+    }
+    console.log(`[HSD STDOUT] ${data.toString().trim()}`);
+  });
+  hsd.stderr.on('data', (data) => {
+    if (process.env.SILENCE_HSD) {
+      return;
+    }
+    console.log(`[HSD STDERR] ${data.toString().trim()}`);
+  });
   hsd.on('close', (code) => {
     if (code && code !== 143) {
       const err = new Error(`HSD exited with non-zero exit code ${code}.`);
@@ -53,9 +70,11 @@ exports.startRegtest = async function () {
       await nodeClient.getInfo();
       break;
     } catch (e) {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
     }
   }
+
+  await new Promise((resolve) => setTimeout(resolve, 3000));
 };
 
 exports.stopRegtest = async function () {
@@ -84,11 +103,14 @@ exports.createWallet = function (walletId, passphrase) {
 };
 
 exports.createAliceBob = async function () {
-  const wids = [`test-wallet-${Date.now()}-alice`, `test-wallet-${Date.now()}-bob`];
+  const wids = [
+    `test-wallet-${Date.now()}-alice`,
+    `test-wallet-${Date.now()}-bob`,
+  ];
   for (const wid of wids) {
     await exports.createWallet(wid, 'password');
     const addr = await exports.generateAddress(wid);
-    await exports.generateToAddress(addr.address, 5);
+    await exports.generateToAddress(addr.address, 20);
   }
   await exports.mine(10);
 
@@ -96,13 +118,13 @@ exports.createAliceBob = async function () {
     'regtest',
     wids[0],
     'test',
-    staticPassphraseGetter('password'),
+    staticPassphraseGetter('password')
   );
   const bob = new Context(
     'regtest',
     wids[1],
     'test',
-    staticPassphraseGetter('password'),
+    staticPassphraseGetter('password')
   );
 
   return {
@@ -159,7 +181,7 @@ exports.sendFinalize = async function (walletId, name) {
 };
 
 exports.setupSwap = async function () {
-  const {alice, bob} = await exports.createAliceBob();
+  const { alice, bob } = await exports.createAliceBob();
   const name = await exports.grindName();
   await exports.sendOpen(alice.walletId, name);
   await exports.mine(8);
@@ -168,16 +190,15 @@ exports.setupSwap = async function () {
   await exports.sendReveal(alice.walletId, name);
   await exports.mine(10);
   await exports.sendUpdate(alice.walletId, name, {
-    records: [{
-      type: 'NS',
-      ns: 'alice.com.',
-    }],
+    records: [
+      {
+        type: 'NS',
+        ns: 'alice.com.',
+      },
+    ],
   });
   await exports.mine(1);
-  const transferLock = await transferNameLock(
-    alice,
-    name,
-  );
+  const transferLock = await transferNameLock(alice, name);
   await exports.mine(10);
   const finalizeLock = await finalizeNameLock(alice, transferLock);
   await exports.mine(1);
