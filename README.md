@@ -99,7 +99,7 @@ You can see your list of active auctions by running `shakedex list-auctions`. Th
 
 ```
 
-Similarly, you can see the list of names you have bought by running `shakedex list-fulfillments`. The output looks something like this:
+Similarly, you can see the list of names you have bought by running `shakedex list-fills`. The output looks something like this:
 
 ```
 ┌──────┬────────────────────────────┬────────────┬─────────────────────┬─────────────────────┬─────────────────────┬─────────────────────┐
