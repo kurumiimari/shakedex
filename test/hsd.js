@@ -73,6 +73,8 @@ exports.startRegtest = async function () {
       await new Promise((resolve) => setTimeout(resolve, 1000));
     }
   }
+
+  await new Promise((resolve) => setTimeout(resolve, 3000));
 };
 
 exports.stopRegtest = async function () {
