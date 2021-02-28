@@ -8,7 +8,8 @@
   },
   "scripts": {
     "test": "mocha",
-    "format": "prettier --write ./**/*.js"
+    "format:fix": "prettier --write ./**/*.js",
+    "format:check": "prettier --check ./**/*.js"
   },
   "repository": {
     "type": "git",
