@@ -5,6 +5,5 @@ workflows:
   node-tests:
     jobs:
       - node/test
-      - run:
-          command: npm run format:check
-          name: Check format
+      - node/test
+          run-command: npm run format:check
