@@ -1,64 +1,66 @@
-const { program } = require('commander');
+const {program} = require('commander');
 const pkg = require('../../package.json');
-const { transferNameLock } = require('../swapService.js');
-const { Context, promptPassphraseGetter } = require('../context.js');
+const {transferNameLock} = require('../swapService.js');
+const {Context, promptPassphraseGetter} = require('../context.js');
 const Table = require('cli-table3');
-const { finalizeNameLock } = require('../swapService.js');
+const {finalizeNameLock} = require('../swapService.js');
 const inquirer = require('inquirer');
 const fs = require('fs');
-const { SwapFinalize } = require('../swapFinalize.js');
-const { SwapFill } = require('../swapFill.js');
-const { NameLockCancelFinalize } = require('../nameLock.js');
-const { finalizeNameLockCancel } = require('../swapService.js');
-const { NameLockCancelTransfer } = require('../nameLock.js');
-const { transferNameLockCancel } = require('../swapService.js');
-const { linearReductionStrategy } = require('../auction.js');
-const { AuctionFactory, Auction } = require('../auction.js');
-const { NameLockTransfer, NameLockFinalize } = require('../nameLock.js');
-const { createLevelStore } = require('../dataStore.js');
-const { finalizeSwap } = require('../swapService.js');
-const { fillSwap } = require('../swapService.js');
-const { Client } = require('bcurl');
-const { format } = require('date-fns');
+const {staticPassphraseGetter} = require('../context.js');
+const {SwapFinalize} = require('../swapFinalize.js');
+const {SwapFill} = require('../swapFill.js');
+const {NameLockCancelFinalize} = require('../nameLock.js');
+const {finalizeNameLockCancel} = require('../swapService.js');
+const {NameLockCancelTransfer} = require('../nameLock.js');
+const {transferNameLockCancel} = require('../swapService.js');
+const {linearReductionStrategy} = require('../auction.js');
+const {AuctionFactory, Auction} = require('../auction.js');
+const {NameLockTransfer, NameLockFinalize} = require('../nameLock.js');
+const {createLevelStore} = require('../dataStore.js');
+const {finalizeSwap} = require('../swapService.js');
+const {fillSwap} = require('../swapService.js');
+const {Client} = require('bcurl');
+const {format} = require('date-fns');
 
 program
   .version(pkg.version)
   .option(
     '-p, --prefix <prefix>',
     'Prefix directory to write the database to.',
-    `${process.env.HOME}/.shakedex`
+    `${process.env.HOME}/.shakedex`,
   )
   .option(
     '-n, --network <network>',
     'Handshake network to connect to.',
-    'regtest'
+    'regtest',
   )
   .option('-w, --wallet-id <walletId>', 'Handshake wallet ID.', 'primary')
   .option('-a, --api-key <apiKey>', 'Handshake wallet API key.')
   .option(
     '--shakedex-web-host <shakedexWebHost>',
     'Shakedex web hostname.',
-    'www.shakedex.com'
-  );
+    'www.shakedex.com',
+  )
+  .option('--no-passphrase', 'Disable prompts for the wallet passphrase.');
 
 program
   .command('transfer-lock <name>')
   .description(
-    'Posts a name lock transaction, which when finalized allows the name to be auctioned.'
+    'Posts a name lock transaction, which when finalized allows the name to be auctioned.',
   )
   .action(transferLock);
 
 program
   .command('finalize-lock <name>')
   .description(
-    'Finalizes a name lock transaction, which allows the name to be auctioned.'
+    'Finalizes a name lock transaction, which allows the name to be auctioned.',
   )
   .action(finalizeLock);
 
 program
   .command('transfer-lock-cancel <name>')
   .description(
-    'Begins cancelling a name lock by transferring it back to the sender.'
+    'Begins cancelling a name lock by transferring it back to the sender.',
   )
   .action(transferLockCancel);
 
@@ -111,7 +113,7 @@ function getContext(opts) {
     opts.network,
     opts.walletId,
     opts.apiKey,
-    promptPassphraseGetter()
+    opts.noPassphrase ? staticPassphraseGetter('') : promptPassphraseGetter(),
   );
 }
 
@@ -126,7 +128,7 @@ async function setupCLI() {
     console.error(e);
     console.error();
     console.error(
-      `Please report this as an issue by visiting ${pkg.bugs.url}/new.`
+      `Please report this as an issue by visiting ${pkg.bugs.url}/new.`,
     );
     throw e;
   }
@@ -152,11 +154,11 @@ async function confirm(message) {
 }
 
 async function transferLock(name) {
-  const { db, context } = await setupCLI();
+  const {db, context} = await setupCLI();
 
   await confirm(
     `Your name ${name} will be transferred to a locking script. ` +
-      'This can be undone, but requires additional on-chain transactions. Do you wish to continue?'
+    'This can be undone, but requires additional on-chain transactions. Do you wish to continue?',
   );
 
   log('Performing locking script transfer.');
@@ -164,18 +166,18 @@ async function transferLock(name) {
   await db.putLockTransfer(lockTransfer);
   log(
     `Name transferred to locking script with transaction hash ${lockTransfer.transferTxHash.toString(
-      'hex'
-    )}.`
+      'hex',
+    )}.`,
   );
   log('Please wait at least 15 minutes for your transaction to be confirmed.');
 }
 
 async function finalizeLock(name) {
-  const { db, context } = await setupCLI();
+  const {db, context} = await setupCLI();
 
   await confirm(
     `Your transfer of ${name} to the locking script will be finalized. ` +
-      'This can be undone, but requires additional on-chain transactions. Do you wish to continue?'
+    'This can be undone, but requires additional on-chain transactions. Do you wish to continue?',
   );
 
   const nameState = await db.getOutboundNameState(name);
@@ -189,19 +191,19 @@ async function finalizeLock(name) {
   const transferJSON = await db.getLockTransfer(name);
   if (!transferJSON) {
     throw new Error(
-      `Name transfer for ${name} was not found. This implies database corruption; please file an issue.`
+      `Name transfer for ${name} was not found. This implies database corruption; please file an issue.`,
     );
   }
   const transfer = new NameLockTransfer(transferJSON);
   const confirmed = await transfer.getConfirmationDetails(context);
   if (!confirmed.confirmedAt) {
     die(
-      `The transaction transferring ${name} to the locking script is unconfirmed. Please try again later.`
+      `The transaction transferring ${name} to the locking script is unconfirmed. Please try again later.`,
     );
   }
   if (!confirmed.spendable) {
     die(
-      `The transfer of ${name} to the locking script is in the lockup period. Please try again in ${confirmed.spendableIn} blocks.`
+      `The transfer of ${name} to the locking script is in the lockup period. Please try again in ${confirmed.spendableIn} blocks.`,
     );
   }
 
@@ -209,7 +211,7 @@ async function finalizeLock(name) {
   const lockFinalize = await finalizeNameLock(context, transfer);
   await db.putLockFinalize(lockFinalize);
   log(
-    `Name finalized to locking script with transaction hash ${lockFinalize.finalizeTxHash}.`
+    `Name finalized to locking script with transaction hash ${lockFinalize.finalizeTxHash}.`,
   );
   log('Please wait at least 15 minutes for your transaction to be confirmed.');
 }
@@ -217,10 +219,10 @@ async function finalizeLock(name) {
 async function transferLockCancel(name) {
   await confirm(
     `Your transfer of ${name} to the locking script will be cancelled. You will need to finalize this ` +
-      'transfer to regain ownership of the name. Do you wish to continue?'
+    'transfer to regain ownership of the name. Do you wish to continue?',
   );
 
-  const { db, context } = await setupCLI();
+  const {db, context} = await setupCLI();
 
   const nameState = await db.getOutboundNameState(name);
   if (nameState === null) {
@@ -232,7 +234,7 @@ async function transferLockCancel(name) {
   if (nameState === 'AUCTION') {
     await confirm(
       'WARNING! Your auction is already live. If someone redeems one of your pre-signed auction ' +
-        'transactions, your name name will be irrevocably transferred to them. Do you understand this?'
+      'transactions, your name name will be irrevocably transferred to them. Do you understand this?',
     );
   }
 
@@ -242,14 +244,14 @@ async function transferLockCancel(name) {
   await db.putLockCancelTransfer(context, transferCancel);
   log(
     `Name lock transferred back to seller with transaction hash ${transferCancel.transferTxHash.toString(
-      'hex'
-    )}.`
+      'hex',
+    )}.`,
   );
   log('Please wait 15 minutes for your transaction to be confirmed.');
 }
 
 async function finalizeLockCancel(name) {
-  const { db, context } = await setupCLI();
+  const {db, context} = await setupCLI();
 
   const nameState = await db.getOutboundNameState(name);
   if (nameState !== 'CANCEL_TRANSFER') {
@@ -262,14 +264,14 @@ async function finalizeLockCancel(name) {
   await db.putLockCancelFinalize(finalize);
   log(
     `Name lock finalized back to seller with transaction hash ${finalize.finalizeTxHash.toString(
-      'hex'
-    )}.`
+      'hex',
+    )}.`,
   );
   log('Please wait 15 minutes for your transaction to be confirmed.');
 }
 
 async function createAuction(name) {
-  const { db, opts, context } = await setupCLI();
+  const {db, opts, context} = await setupCLI();
   const shakedexWebHost = opts.shakedexWebHost;
 
   const nameState = await db.getOutboundNameState(name);
@@ -299,14 +301,14 @@ async function createAuction(name) {
   const confirmation = await finalize.getConfirmationDetails(context);
   if (!confirmation.confirmedAt) {
     die(
-      `The transaction finalizing ${name} to the locking script is unconfirmed. Please try again later.`
+      `The transaction finalizing ${name} to the locking script is unconfirmed. Please try again later.`,
     );
   }
 
-  const { outPath, auction } = await promptAuctionParameters(
+  const {outPath, auction} = await promptAuctionParameters(
     db,
     context,
-    finalize
+    finalize,
   );
 
   const stream = fs.createWriteStream(outPath);
@@ -344,7 +346,7 @@ async function createAuction(name) {
 }
 
 async function promptAuctionParameters(db, context, finalize) {
-  const { name } = finalize;
+  const {name} = finalize;
 
   const answers = await inquirer.prompt([
     {
@@ -452,11 +454,11 @@ async function promptAuctionParameters(db, context, finalize) {
     return promptAuctionParameters(db, context, finalize);
   }
 
-  return { outPath, auction };
+  return {outPath, auction};
 }
 
 async function listAuctions() {
-  const { db, context } = await setupCLI();
+  const {db, context} = await setupCLI();
 
   const table = new Table({
     head: [
@@ -483,7 +485,7 @@ async function listAuctions() {
     switch (state) {
       case 'TRANSFER': {
         const transfer = new NameLockTransfer(
-          await db.getLockTransfer(name, version)
+          await db.getLockTransfer(name, version),
         );
         const confirmation = await transfer.getConfirmationDetails(context);
         table.push([
@@ -492,8 +494,8 @@ async function listAuctions() {
           confirmation.confirmedAt ? 'YES' : 'NO',
           confirmation.confirmedAt
             ? confirmation.spendable
-              ? '0 BLOCKS'
-              : `${confirmation.spendableIn} BLOCKS`
+            ? '0 BLOCKS'
+            : `${confirmation.spendableIn} BLOCKS`
             : '-',
           format(new Date(transfer.broadcastAt), 'MM/dd/yyyy HH:MM:SS'),
           confirmation.confirmedAt
@@ -504,7 +506,7 @@ async function listAuctions() {
       }
       case 'FINALIZE': {
         const finalize = new NameLockFinalize(
-          await db.getLockFinalize(name, version)
+          await db.getLockFinalize(name, version),
         );
         const confirmation = await finalize.getConfirmationDetails(context);
         table.push([
@@ -534,10 +536,10 @@ async function listAuctions() {
       }
       case 'CANCEL_TRANSFER': {
         const cancelTransfer = new NameLockCancelTransfer(
-          await db.getLockCancelTransfer(name, version)
+          await db.getLockCancelTransfer(name, version),
         );
         const confirmation = await cancelTransfer.getConfirmationDetails(
-          context
+          context,
         );
         table.push([
           name,
@@ -545,8 +547,8 @@ async function listAuctions() {
           confirmation.confirmedAt ? 'YES' : 'NO',
           confirmation.confirmedAt
             ? confirmation.spendable
-              ? '0 BLOCKS'
-              : `${confirmation.spendableIn} BLOCKS`
+            ? '0 BLOCKS'
+            : `${confirmation.spendableIn} BLOCKS`
             : '-',
           format(new Date(cancelTransfer.broadcastAt), 'MM/dd/yyyy HH:MM:SS'),
           confirmation.confirmedAt
@@ -557,10 +559,10 @@ async function listAuctions() {
       }
       case 'CANCEL_FINALIZE': {
         const cancelFinalize = new NameLockCancelFinalize(
-          await db.getLockCancelFinalize(name, version)
+          await db.getLockCancelFinalize(name, version),
         );
         const confirmation = await cancelFinalize.getConfirmationDetails(
-          context
+          context,
         );
         table.push([
           name,
@@ -582,18 +584,18 @@ async function listAuctions() {
 }
 
 async function auctionDetails(name) {
-  const { db, context } = await setupCLI();
+  const {db, context} = await setupCLI();
   const status = await db.getOutboundNameState(name);
   if (status !== 'AUCTION') {
     die(
-      `Name ${name} is not in the AUCTION state. Run shakedex list-outbound-names to view this name.`
+      `Name ${name} is not in the AUCTION state. Run shakedex list-outbound-names to view this name.`,
     );
   }
 
   const auctionJSON = await db.getAuction(name);
   if (!auctionJSON) {
     throw new Error(
-      `Auction for ${name} was not found. This implies database corruption; please file an issue.`
+      `Auction for ${name} was not found. This implies database corruption; please file an issue.`,
     );
   }
   const auction = new Auction(auctionJSON);
@@ -602,28 +604,28 @@ async function auctionDetails(name) {
   log('Basic info:');
   const infoTable = new Table();
   infoTable.push(
-    { Name: name },
-    { 'Locking TX Hash': auction.lockingTxHash.toString('hex') },
-    { 'Locking Output Idx': auction.lockingOutputIdx },
+    {Name: name},
+    {'Locking TX Hash': auction.lockingTxHash.toString('hex')},
+    {'Locking Output Idx': auction.lockingOutputIdx},
     {
       'First Bid Unlocks At': format(
         new Date(auction.data[0].lockTime * 1000),
-        'MM/dd/yyyy HH:MM:SS'
+        'MM/dd/yyyy HH:MM:SS',
       ),
     },
     {
       'Last Bid Unlocks At': format(
         new Date(auction.data[auction.data.length - 1].lockTime * 1000),
-        'MM/dd/yyyy HH:MM:SS'
+        'MM/dd/yyyy HH:MM:SS',
       ),
     },
-    { 'Starting Bid': (auction.data[0].price / 1e6).toFixed(6) },
+    {'Starting Bid': (auction.data[0].price / 1e6).toFixed(6)},
     {
       'Ending Bid': (auction.data[auction.data.length - 1].price / 1e6).toFixed(
-        6
+        6,
       ),
     },
-    { 'Fulfilled?': isFulfilled ? 'YES' : 'NO' }
+    {'Fulfilled?': isFulfilled ? 'YES' : 'NO'},
   );
   process.stdout.write(infoTable.toString());
   process.stdout.write('\n');
@@ -646,7 +648,7 @@ async function fillAuction(auctionPath) {
     die(`Proposals file not found.`);
   }
 
-  const { db, context } = await setupCLI();
+  const {db, context} = await setupCLI();
   const readStream = await fs.createReadStream(auctionPath);
   const auction = await Auction.fromStream(readStream);
 
@@ -673,13 +675,13 @@ async function fillAuction(auctionPath) {
     },
     {
       Price: `${(bestBid.price / 1e6).toFixed(6)} HNS`,
-    }
+    },
   );
   process.stdout.write(table.toString());
   process.stdout.write('\n');
 
   await confirm(
-    'Are you sure you want to fill the auction above? This action is not reversible. You are responsible for all blockchain fees.'
+    'Are you sure you want to fill the auction above? This action is not reversible. You are responsible for all blockchain fees.',
   );
 
   const fill = await fillSwap(context, auction.toSwapProof(bestProofIdx));
@@ -689,7 +691,7 @@ async function fillAuction(auctionPath) {
 }
 
 async function finalizeAuction(name) {
-  const { db, context } = await setupCLI();
+  const {db, context} = await setupCLI();
   const status = await db.getInboundNameState(name);
   if (status !== 'FILL') {
     die(`Name ${name} is not in the FILL state.`);
@@ -698,19 +700,19 @@ async function finalizeAuction(name) {
   const fillJSON = await db.getSwapFill(name);
   if (!fillJSON) {
     throw new Error(
-      `Fill fo ${name} was not found. This implies database corruption; please file an issue.`
+      `Fill fo ${name} was not found. This implies database corruption; please file an issue.`,
     );
   }
   const fill = new SwapFill(fillJSON);
   const confirmed = await fill.getConfirmationDetails(context);
   if (!confirmed.confirmedAt) {
     die(
-      `The transaction filling the ${name} auction is unconfirmed. Please try again later.`
+      `The transaction filling the ${name} auction is unconfirmed. Please try again later.`,
     );
   }
   if (!confirmed.spendable) {
     die(
-      `The fill transferring ${name} to the buyer is in the lockup period. Please try again in ${confirmed.spendableIn} blocks.`
+      `The fill transferring ${name} to the buyer is in the lockup period. Please try again in ${confirmed.spendableIn} blocks.`,
     );
   }
 
@@ -719,7 +721,7 @@ async function finalizeAuction(name) {
 }
 
 async function listFills() {
-  const { db, context } = await setupCLI();
+  const {db, context} = await setupCLI();
 
   const table = new Table({
     head: [
@@ -754,8 +756,8 @@ async function listFills() {
           confirmation.confirmedAt ? 'YES' : 'NO',
           confirmation.confirmedAt
             ? confirmation.spendable
-              ? '0 BLOCKS'
-              : `${confirmation.spendableIn} BLOCKS`
+            ? '0 BLOCKS'
+            : `${confirmation.spendableIn} BLOCKS`
             : '-',
           (fill.price / 1e6).toFixed(6),
           format(new Date(fill.broadcastAt), 'MM/dd/yyyy HH:MM:SS'),
@@ -768,7 +770,7 @@ async function listFills() {
       case 'FINALIZE': {
         const fill = new SwapFill(await db.getSwapFill(name, version));
         const finalize = new SwapFinalize(
-          await db.getSwapFinalize(name, version)
+          await db.getSwapFinalize(name, version),
         );
         const confirmation = await fill.getConfirmationDetails(context);
         table.push([

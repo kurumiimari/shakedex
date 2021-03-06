@@ -39,6 +39,11 @@ class Context {
     await this.walletClient.execute('selectwallet', [this.walletId]);
     return this.walletClient.execute(method, args);
   };
+
+  unlockWallet = async () => {
+    const pass = await this.getPassphrase();
+    await this.walletClient.unlock(this.walletId, pass, 60);
+  };
 }
 
 exports.Context = Context;
