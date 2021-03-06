@@ -42,7 +42,7 @@ class Context {
 
   unlockWallet = async () => {
     const pass = await this.getPassphrase();
-    await this.walletClient.unlock(this.walletId, pass, 60);
+    await this.wallet.unlock(pass, 60);
   };
 }
 
