@@ -29,6 +29,7 @@ exports.transferNameLock = async function (context, name) {
   const publicKey = secp256k1.publicKeyCreate(privateKey);
   const lockScript = createLockScript(publicKey);
   const lockScriptAddr = new Address().fromScript(lockScript);
+  await context.unlockWallet();
   const tx = await context.execWallet(
     'sendtransfer',
     name,
@@ -44,6 +45,7 @@ exports.transferNameLock = async function (context, name) {
 };
 
 exports.finalizeNameLock = async function (context, transfer) {
+  await context.unlockWallet();
   const tx = await context.execWallet('sendfinalize', transfer.name);
   return new NameLockFinalize({
     name: transfer.name,
@@ -60,6 +62,7 @@ exports.transferNameLockCancel = async function (
   cancelAddr
 ) {
   const { wallet, nodeClient } = context;
+  await context.unlockWallet();
   cancelAddr = cancelAddr || (await wallet.createAddress('default')).address;
   cancelAddr = coerceAddress(cancelAddr);
   const lockScript = createLockScript(lockFinalize.publicKey);
@@ -124,6 +127,7 @@ exports.transferNameLockCancel = async function (
 
 exports.finalizeNameLockCancel = async function (context, lockCancelTransfer) {
   const { nodeClient } = context;
+  await context.unlockWallet();
   const transferCoinJSON = await nodeClient.getCoin(
     lockCancelTransfer.transferTxHash.toString('hex'),
     lockCancelTransfer.transferOutputIdx
@@ -189,7 +193,7 @@ exports.fillSwap = async function (context, swapProof) {
 
 exports.finalizeSwap = async function (context, fulfillment) {
   const { nodeClient } = context;
-
+  await context.unlockWallet();
   const tx = await nodeClient.getTX(fulfillment.fulfillmentTxHash);
   assert(tx, 'Transaction not found.');
   assert(tx.height > -1, 'Transaction is not confirmed.');
