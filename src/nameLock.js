@@ -42,7 +42,7 @@ class NameLockTransfer {
     const info = await context.execNode('getblockchaininfo');
     const tx = await context.nodeClient.getTX(this.transferTxHash);
     const transferLockup = networks[context.networkName].names.transferLockup;
-    const included = tx.height > -1;
+    const included = tx && tx.height > -1;
     return {
       confirmedAt: included ? tx.mtime * 1000 : null,
       spendable: included ? info.blocks - tx.height > transferLockup : null,
