@@ -16,7 +16,7 @@ function linearReductionStrategy(
   let currIncrement = 0;
 
   return () => {
-    if (currIncrement === timeIncrement) {
+    if (currIncrement > timeIncrement) {
       return null;
     }
 
