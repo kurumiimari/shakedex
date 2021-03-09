@@ -330,7 +330,7 @@ async function createAuction(name) {
     });
     try {
       await client.post('api/v1/auctions', {
-        auction: auction.toJSON(),
+        auction: auction.toJSON(context),
       });
     } catch (e) {
       log('An error occurred posting your proof to Shakedex Web:');
