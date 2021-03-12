@@ -356,6 +356,12 @@ async function promptAuctionParameters(db, context, finalize) {
       choices: ['1 day', '3 days', '5 days', '7 days', '14 days'],
     },
     {
+      type: 'list',
+      name: 'decrementInterval',
+      message: 'How often would you like the price to decrease?',
+      choices: ['Every 15 minutes', 'Every 30 minutes', 'Hourly', 'Daily'],
+    },
+    {
       type: 'input',
       name: 'startPrice',
       message:
@@ -389,6 +395,7 @@ async function promptAuctionParameters(db, context, finalize) {
   ]);
 
   const durationDays = Number(answers.duration.split(' ')[0]);
+  const decrementInterval = answers.decrementInterval;
   const startPrice = Number(answers.startPrice);
   const endPrice = Number(answers.endPrice);
   if (startPrice < endPrice) {
@@ -396,18 +403,18 @@ async function promptAuctionParameters(db, context, finalize) {
   }
 
   let reductionTimeMS;
-  switch (durationDays) {
-    case 1:
+  switch (decrementInterval) {
+    case 'Every 15 minutes':
+      reductionTimeMS = 15 * 60 * 1000;
+      break;
+    case 'Every 30 minutes':
+      reductionTimeMS = 30 * 60 * 1000;
+      break;
+    case 'Hourly':
       reductionTimeMS = 60 * 60 * 1000;
       break;
-    case 3:
-      reductionTimeMS = 3 * 60 * 60 * 1000;
-      break;
-    case 5:
-    case 7:
-    case 14:
+    case 'Daily':
       reductionTimeMS = 24 * 60 * 60 * 1000;
-      break;
   }
 
   let outPath = answers.outPath;
