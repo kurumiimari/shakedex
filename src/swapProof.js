@@ -133,6 +133,7 @@ class SwapProof {
     const nameState = await context.execNode('getnameinfo', this.name);
     const mtx = await this.toMTX(context);
     const transferOutput = mtx.outputs[0];
+    transferOutput.value = this._lockScriptCoin.value;
     transferOutput.address = this._lockScriptCoin.address;
     transferOutput.covenant.pushHash(rules.hashName(this.name));
     transferOutput.covenant.pushU32(nameState.info.height);
