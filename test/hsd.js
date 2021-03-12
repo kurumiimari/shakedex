@@ -186,6 +186,8 @@ exports.setupSwap = async function () {
   await exports.sendOpen(alice.walletId, name);
   await exports.mine(8);
   await exports.sendBid(alice.walletId, name, 1, 2);
+  await exports.sendBid(alice.walletId, name, 4, 8);
+  await exports.sendBid(alice.walletId, name, 8, 16);
   await exports.mine(10);
   await exports.sendReveal(alice.walletId, name);
   await exports.mine(10);
