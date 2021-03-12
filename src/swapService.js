@@ -79,7 +79,7 @@ exports.transferNameLockCancel = async function (
       type: rules.types.TRANSFER,
       items: [],
     },
-    value: 0,
+    value: lockFinalizeCoin.value,
     address: lockScriptAddr,
   });
   transferOutput.covenant.pushHash(rules.hashName(lockFinalize.name));
