@@ -6,6 +6,7 @@ const Table = require('cli-table3');
 const {finalizeNameLock} = require('../swapService.js');
 const inquirer = require('inquirer');
 const fs = require('fs');
+const {postAuction} = require('../swapService.js');
 const {staticPassphraseGetter} = require('../context.js');
 const {SwapFinalize} = require('../swapFinalize.js');
 const {SwapFill} = require('../swapFill.js');
@@ -19,7 +20,6 @@ const {NameLockTransfer, NameLockFinalize} = require('../nameLock.js');
 const {createLevelStore} = require('../dataStore.js');
 const {finalizeSwap} = require('../swapService.js');
 const {fillSwap} = require('../swapService.js');
-const {Client} = require('bcurl');
 const {format} = require('date-fns');
 
 program
@@ -73,6 +73,11 @@ program
   .command('create-auction <name>')
   .description('Creates auction presigns.')
   .action(createAuction);
+
+program
+  .command('publish-auction <auctionFile>')
+  .description('Uploads an auction file to Shakedex Web.')
+  .action(publishAuction);
 
 program
   .command('list-auctions')
@@ -324,14 +329,8 @@ async function createAuction(name) {
   ]);
 
   if (shouldPostAnswer.shouldPost) {
-    const client = new Client({
-      host: shakedexWebHost,
-      ssl: true,
-    });
     try {
-      await client.post('api/v1/auctions', {
-        auction: auction.toJSON(context),
-      });
+      await postAuction(context, auction, shakedexWebHost);
     } catch (e) {
       log('An error occurred posting your proof to Shakedex Web:');
       log(e.message);
@@ -343,6 +342,29 @@ async function createAuction(name) {
   await db.putAuction(context, auction);
 
   log(`Your auction has been successfully written to ${outPath}.`);
+}
+
+async function publishAuction(auctionFile) {
+  const exists = fs.existsSync(auctionFile);
+  if (!exists) {
+    die(`Auction file not found.`);
+  }
+
+  const {opts, context} = await setupCLI();
+  const readStream = await fs.createReadStream(auctionFile);
+  const auction = await Auction.fromStream(readStream);
+
+  try {
+    await postAuction(context, auction, opts.shakedexWebHost);
+  } catch (e) {
+    log('An error occurred posting your proof to Shakedex Web:');
+    log(e.message);
+    log(e.stack);
+    return;
+  }
+
+  log(`Your auction for ${auction.name} was successfully posted to ${opts.shakedexWebHost}.`);
+  log(`Link: https://${opts.shakedexWebHost}/a/${auction.name}`);
 }
 
 async function promptAuctionParameters(db, context, finalize) {

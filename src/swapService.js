@@ -20,6 +20,7 @@ const { coerceCoin } = require('./conversions.js');
 const { NameLockCancelFinalize } = require('./nameLock.js');
 const { createFinalize } = require('./utils.js');
 const { NameLockCancelTransfer } = require('./nameLock.js');
+const { Client } = require('bcurl');
 
 const assert = assertModule.strict;
 const { ALL, ANYONECANPAY, SINGLE } = common.hashType;
@@ -217,5 +218,20 @@ exports.finalizeSwap = async function (context, fulfillment) {
     name: fulfillment.name,
     finalizeTxHash: mtx.toJSON().hash,
     broadcastAt: Date.now(),
+  });
+};
+
+exports.postAuction = async function (
+  context,
+  auction,
+  shakedexWebHost = 'www.shakedex.com'
+) {
+  const client = new Client({
+    host: shakedexWebHost,
+    ssl: true,
+  });
+
+  await client.post('api/v1/auctions', {
+    auction: auction.toJSON(context),
   });
 };
