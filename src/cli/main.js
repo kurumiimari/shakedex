@@ -6,6 +6,7 @@ const Table = require('cli-table3');
 const {finalizeNameLock} = require('../swapService.js');
 const inquirer = require('inquirer');
 const fs = require('fs');
+const {log, die} = require('./util.js');
 const {postAuction} = require('../swapService.js');
 const {staticPassphraseGetter} = require('../context.js');
 const {SwapFinalize} = require('../swapFinalize.js');
@@ -17,10 +18,11 @@ const {transferNameLockCancel} = require('../swapService.js');
 const {linearReductionStrategy} = require('../auction.js');
 const {AuctionFactory, Auction} = require('../auction.js');
 const {NameLockTransfer, NameLockFinalize} = require('../nameLock.js');
-const {createLevelStore} = require('../dataStore.js');
+const {createLevelStore, migrate} = require('../dataStore.js');
 const {finalizeSwap} = require('../swapService.js');
 const {fillSwap} = require('../swapService.js');
 const {format} = require('date-fns');
+const Network = require('hsd/lib/protocol/network.js');
 
 program
   .version(pkg.version)
@@ -138,8 +140,18 @@ async function setupCLI() {
     throw e;
   }
 
+  try {
+    Network.get(opts.network);
+  } catch (e) {
+    die(`Invalid network ${opts.network}.`);
+    return;
+  }
+
   out.context = getContext(opts);
-  out.db = await createLevelStore(opts.prefix);
+
+  await migrate(opts.prefix);
+
+  out.db = await createLevelStore(opts.prefix, opts.network);
   out.opts = opts;
   return out;
 }
@@ -819,13 +831,4 @@ async function listFills() {
   }
   process.stdout.write(table.toString());
   process.stdout.write('\n');
-}
-
-function die(msg) {
-  console.log(msg);
-  process.exit(1);
-}
-
-function log(msg) {
-  console.log(`>> ${msg}`);
 }

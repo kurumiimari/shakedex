@@ -1,5 +1,8 @@
 const path = require('path');
 const level = require('level');
+const fs = require('fs');
+const inquirer = require('inquirer');
+const {log} = require('./cli/util.js');
 
 class LevelBackend {
   constructor(path) {
@@ -128,11 +131,11 @@ class DataStore {
       .put(`names/outbound/list/${lockTransfer.name}`, newVersion)
       .put(
         `names/outbound/state/${lockTransfer.name}/${newVersion}`,
-        'TRANSFER'
+        'TRANSFER',
       )
       .putJSON(
         `names/locks/transfers/${lockTransfer.name}/${newVersion}`,
-        lockTransfer.toJSON()
+        lockTransfer.toJSON(),
       )
       .commit();
   }
@@ -155,7 +158,7 @@ class DataStore {
       .put(`names/outbound/state/${lockFinalize.name}/${version}`, 'FINALIZE')
       .putJSON(
         `names/locks/finalizes/${lockFinalize.name}/${version}`,
-        lockFinalize.toJSON()
+        lockFinalize.toJSON(),
       )
       .commit();
   }
@@ -177,11 +180,11 @@ class DataStore {
       .batch()
       .put(
         `names/outbound/state/${lockCancelTransfer.name}/${version}`,
-        'CANCEL_TRANSFER'
+        'CANCEL_TRANSFER',
       )
       .putJSON(
         `names/locks/cancelTransfers/${lockCancelTransfer.name}/${version}`,
-        lockCancelTransfer.toJSON(context)
+        lockCancelTransfer.toJSON(context),
       )
       .commit();
   }
@@ -195,7 +198,7 @@ class DataStore {
     }
 
     return this.backend.getJSON(
-      `names/locks/cancelTransfers/${name}/${version}`
+      `names/locks/cancelTransfers/${name}/${version}`,
     );
   }
 
@@ -205,11 +208,11 @@ class DataStore {
       .batch()
       .put(
         `names/outbound/state/${lockCancelFinalize.name}/${version}`,
-        'CANCEL_FINALIZE'
+        'CANCEL_FINALIZE',
       )
       .putJSON(
         `names/locks/cancelFinalizes/${lockCancelFinalize.name}/${version}`,
-        lockCancelFinalize.toJSON()
+        lockCancelFinalize.toJSON(),
       )
       .commit();
   }
@@ -223,7 +226,7 @@ class DataStore {
     }
 
     return this.backend.getJSON(
-      `names/locks/cancelFinalizes/${name}/${version}`
+      `names/locks/cancelFinalizes/${name}/${version}`,
     );
   }
 
@@ -245,7 +248,7 @@ class DataStore {
       .put(`names/outbound/state/${auction.name}/${version}`, 'AUCTION')
       .putJSON(
         `names/auctions/${auction.name}/${version}`,
-        auction.toJSON(context)
+        auction.toJSON(context),
       )
       .commit();
   }
@@ -290,7 +293,7 @@ class DataStore {
       .put(`names/inbound/state/${finalize.name}/${version}`, 'FINALIZE')
       .putJSON(
         `names/swaps/finalizes/${finalize.name}/${version}`,
-        finalize.toJSON()
+        finalize.toJSON(),
       )
       .commit();
   }
@@ -306,8 +309,60 @@ class DataStore {
 
 exports.DataStore = DataStore;
 
-exports.createLevelStore = async function (prefix) {
-  const dbPath = path.join(prefix, 'shakedex.db');
+const migrations = [
+  'initial',
+  'network_setup',
+];
+
+exports.migrate = async function (prefix) {
+  let currMigration = path.join(prefix, 'migration');
+  if (!fs.existsSync(currMigration)) {
+    currMigration = 'initial';
+  }
+
+  return exports.executeMigrations(prefix, currMigration);
+};
+
+exports.executeMigrations = async function (prefix, currMigration) {
+  let nextMigration = currMigration;
+
+  switch (currMigration) {
+    case migrations[0]: {
+      const dbPath = path.join(prefix, 'shakedex.db');
+      if (!fs.existsSync(dbPath)) {
+        nextMigration = migrations[1];
+        break;
+      }
+
+      const selectedNetwork = await inquirer.prompt([
+        {
+          type: 'list',
+          name: 'value',
+          message: 'In order to support multiple networks, shakedex needs to migrate your name database. Which network did you previously use shakedex with?',
+          choices: ['main', 'simnet', 'regtest', 'testnet'],
+        },
+      ]);
+
+      log(`Running migration ${migrations[0]}`);
+      await fs.promises.rename(dbPath, path.join(prefix, `shakedex.${selectedNetwork.value}.db`));
+      nextMigration = migrations[1];
+      break;
+    }
+    default:
+      return;
+  }
+
+  await exports.storeMigration(prefix, nextMigration);
+  return exports.executeMigrations(prefix, nextMigration);
+};
+
+exports.storeMigration = async function (prefix, currMigration) {
+  const migrationFile = path.join(prefix, 'migration');
+  await fs.promises.writeFile(migrationFile, currMigration);
+};
+
+exports.createLevelStore = async function (prefix, networkName) {
+  const dbPath = path.join(prefix, `shakedex.${networkName}.db`);
   const levelBackend = new LevelBackend(dbPath);
   await levelBackend.open();
   return new DataStore(levelBackend);

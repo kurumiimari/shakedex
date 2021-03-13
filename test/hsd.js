@@ -94,6 +94,7 @@ class LocalHSD extends HSD {
       this.stopAwaiter && this.stopAwaiter.resolve();
     });
 
+    this.hsd = hsd;
     return this.verifyConnection();
   }
 
