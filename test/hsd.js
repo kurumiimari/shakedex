@@ -1,13 +1,13 @@
-const {spawn} = require('child_process');
+const { spawn } = require('child_process');
 const path = require('path');
-const {NodeClient, WalletClient} = require('hs-client');
+const { NodeClient, WalletClient } = require('hs-client');
 const Network = require('hsd/lib/protocol/network.js');
-const {Context, staticPassphraseGetter} = require('../src/context.js');
-const {transferNameLock, finalizeNameLock} = require('../src/swapService.js');
+const { Context, staticPassphraseGetter } = require('../src/context.js');
+const { transferNameLock, finalizeNameLock } = require('../src/swapService.js');
 
 const network = Network.get('regtest');
 const hsdPath = path.resolve(
-  path.join(__dirname, '..', 'node_modules', 'hsd', 'bin', 'hsd'),
+  path.join(__dirname, '..', 'node_modules', 'hsd', 'bin', 'hsd')
 );
 
 let hsd;
@@ -122,8 +122,7 @@ class RemoteHSD extends HSD {
     return this.verifyConnection();
   }
 
-  async stop() {
-  }
+  async stop() {}
 }
 
 exports.startRegtest = async function () {
@@ -180,14 +179,14 @@ exports.createAliceBob = async function () {
     wids[0],
     hsd.apiKey,
     staticPassphraseGetter('password'),
-    hsd.host,
+    hsd.host
   );
   const bob = new Context(
     'regtest',
     wids[1],
     hsd.apiKey,
     staticPassphraseGetter('password'),
-    hsd.host,
+    hsd.host
   );
 
   return {
@@ -244,7 +243,7 @@ exports.sendFinalize = async function (walletId, name) {
 };
 
 exports.setupSwap = async function () {
-  const {alice, bob} = await exports.createAliceBob();
+  const { alice, bob } = await exports.createAliceBob();
   const name = await exports.grindName();
   await exports.sendOpen(alice.walletId, name);
   await exports.mine(8);
