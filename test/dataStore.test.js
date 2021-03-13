@@ -1,8 +1,8 @@
 const os = require('os');
 const fs = require('fs');
 const path = require('path');
-const {migrate} = require('../src/dataStore.js');
-const {assert} = require('chai');
+const { migrate } = require('../src/dataStore.js');
+const { assert } = require('chai');
 
 describe('Data migrations', () => {
   describe('on a clean shakedex install', () => {
@@ -14,7 +14,9 @@ describe('Data migrations', () => {
     });
 
     it('should skip to network_setup', async () => {
-      const migration = await fs.promises.readFile(path.join(tmpdir, 'migration'));
+      const migration = await fs.promises.readFile(
+        path.join(tmpdir, 'migration')
+      );
       assert.strictEqual(migration.toString('utf-8'), 'network_setup');
     });
   });
@@ -47,7 +49,9 @@ describe('Data migrations', () => {
     });
 
     it('should end at network_setup', async () => {
-      const migration = await fs.promises.readFile(path.join(tmpdir, 'migration'));
+      const migration = await fs.promises.readFile(
+        path.join(tmpdir, 'migration')
+      );
       assert.strictEqual(migration.toString('utf-8'), 'network_setup');
     });
   });

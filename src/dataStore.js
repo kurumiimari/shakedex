@@ -2,7 +2,7 @@ const path = require('path');
 const level = require('level');
 const fs = require('fs');
 const inquirer = require('inquirer');
-const {log} = require('./cli/util.js');
+const { log } = require('./cli/util.js');
 
 class LevelBackend {
   constructor(path) {
@@ -131,11 +131,11 @@ class DataStore {
       .put(`names/outbound/list/${lockTransfer.name}`, newVersion)
       .put(
         `names/outbound/state/${lockTransfer.name}/${newVersion}`,
-        'TRANSFER',
+        'TRANSFER'
       )
       .putJSON(
         `names/locks/transfers/${lockTransfer.name}/${newVersion}`,
-        lockTransfer.toJSON(),
+        lockTransfer.toJSON()
       )
       .commit();
   }
@@ -158,7 +158,7 @@ class DataStore {
       .put(`names/outbound/state/${lockFinalize.name}/${version}`, 'FINALIZE')
       .putJSON(
         `names/locks/finalizes/${lockFinalize.name}/${version}`,
-        lockFinalize.toJSON(),
+        lockFinalize.toJSON()
       )
       .commit();
   }
@@ -180,11 +180,11 @@ class DataStore {
       .batch()
       .put(
         `names/outbound/state/${lockCancelTransfer.name}/${version}`,
-        'CANCEL_TRANSFER',
+        'CANCEL_TRANSFER'
       )
       .putJSON(
         `names/locks/cancelTransfers/${lockCancelTransfer.name}/${version}`,
-        lockCancelTransfer.toJSON(context),
+        lockCancelTransfer.toJSON(context)
       )
       .commit();
   }
@@ -198,7 +198,7 @@ class DataStore {
     }
 
     return this.backend.getJSON(
-      `names/locks/cancelTransfers/${name}/${version}`,
+      `names/locks/cancelTransfers/${name}/${version}`
     );
   }
 
@@ -208,11 +208,11 @@ class DataStore {
       .batch()
       .put(
         `names/outbound/state/${lockCancelFinalize.name}/${version}`,
-        'CANCEL_FINALIZE',
+        'CANCEL_FINALIZE'
       )
       .putJSON(
         `names/locks/cancelFinalizes/${lockCancelFinalize.name}/${version}`,
-        lockCancelFinalize.toJSON(),
+        lockCancelFinalize.toJSON()
       )
       .commit();
   }
@@ -226,7 +226,7 @@ class DataStore {
     }
 
     return this.backend.getJSON(
-      `names/locks/cancelFinalizes/${name}/${version}`,
+      `names/locks/cancelFinalizes/${name}/${version}`
     );
   }
 
@@ -248,7 +248,7 @@ class DataStore {
       .put(`names/outbound/state/${auction.name}/${version}`, 'AUCTION')
       .putJSON(
         `names/auctions/${auction.name}/${version}`,
-        auction.toJSON(context),
+        auction.toJSON(context)
       )
       .commit();
   }
@@ -293,7 +293,7 @@ class DataStore {
       .put(`names/inbound/state/${finalize.name}/${version}`, 'FINALIZE')
       .putJSON(
         `names/swaps/finalizes/${finalize.name}/${version}`,
-        finalize.toJSON(),
+        finalize.toJSON()
       )
       .commit();
   }
@@ -309,10 +309,7 @@ class DataStore {
 
 exports.DataStore = DataStore;
 
-const migrations = [
-  'initial',
-  'network_setup',
-];
+const migrations = ['initial', 'network_setup'];
 
 exports.migrate = async function (prefix) {
   let currMigration = path.join(prefix, 'migration');
@@ -338,13 +335,17 @@ exports.executeMigrations = async function (prefix, currMigration) {
         {
           type: 'list',
           name: 'value',
-          message: 'In order to support multiple networks, shakedex needs to migrate your name database. Which network did you previously use shakedex with?',
+          message:
+            'In order to support multiple networks, shakedex needs to migrate your name database. Which network did you previously use shakedex with?',
           choices: ['main', 'simnet', 'regtest', 'testnet'],
         },
       ]);
 
       log(`Running migration ${migrations[0]}`);
-      await fs.promises.rename(dbPath, path.join(prefix, `shakedex.${selectedNetwork.value}.db`));
+      await fs.promises.rename(
+        dbPath,
+        path.join(prefix, `shakedex.${selectedNetwork.value}.db`)
+      );
       nextMigration = migrations[1];
       break;
     }
