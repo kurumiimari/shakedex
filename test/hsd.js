@@ -1,80 +1,147 @@
-const { spawn } = require('child_process');
+const {spawn} = require('child_process');
 const path = require('path');
-const { NodeClient, WalletClient } = require('hs-client');
+const {NodeClient, WalletClient} = require('hs-client');
 const Network = require('hsd/lib/protocol/network.js');
-const { Context, staticPassphraseGetter } = require('../src/context.js');
-const { transferNameLock, finalizeNameLock } = require('../src/swapService.js');
+const {Context, staticPassphraseGetter} = require('../src/context.js');
+const {transferNameLock, finalizeNameLock} = require('../src/swapService.js');
 
 const network = Network.get('regtest');
 const hsdPath = path.resolve(
-  path.join(__dirname, '..', 'node_modules', 'hsd', 'bin', 'hsd')
+  path.join(__dirname, '..', 'node_modules', 'hsd', 'bin', 'hsd'),
 );
 
 let hsd;
-let stopAwaiter;
+let nodeClient;
+let walletClient;
 
 const zeroAddr = 'rs1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqn6kda';
 
-const nodeClient = new NodeClient({
-  port: network.rpcPort,
-  apiKey: 'test',
-});
+class HSD {
+  constructor(host, apiKey) {
+    this.hsd = null;
+    this.host = host;
+    this.apiKey = apiKey;
+    this.nodeClient = new NodeClient({
+      port: network.rpcPort,
+      host: this.host,
+      apiKey: this.apiKey,
+    });
 
-const walletClient = new WalletClient({
-  port: network.walletPort,
-  apiKey: 'test',
-});
+    this.walletClient = new WalletClient({
+      port: network.walletPort,
+      host: this.host,
+      apiKey: this.apiKey,
+    });
+  }
+
+  async verifyConnection() {
+    console.log('Verifying connection.');
+    for (let i = 0; i <= 3; i++) {
+      if (i === 3) {
+        throw new Error('failed to connect to HSD');
+      }
+
+      try {
+        await this.nodeClient.getInfo();
+        break;
+      } catch (e) {
+        console.error('Error connecting to HSD:', e);
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+    }
+    console.log('Connection OK.');
+  }
+}
+
+class LocalHSD extends HSD {
+  constructor() {
+    super('127.0.0.1', 'test');
+  }
+
+  async start() {
+    if (this.hsd) {
+      return;
+    }
+
+    const hsd = spawn(hsdPath, [
+      '--index-tx',
+      '--network=regtest',
+      `--api-key=${this.apiKey}`,
+      '--log-level=debug',
+    ]);
+    hsd.stdout.on('data', (data) => {
+      if (process.env.SILENCE_HSD) {
+        return;
+      }
+      console.log(`[HSD STDOUT] ${data.toString().trim()}`);
+    });
+    hsd.stderr.on('data', (data) => {
+      if (process.env.SILENCE_HSD) {
+        return;
+      }
+      console.log(`[HSD STDERR] ${data.toString().trim()}`);
+    });
+    hsd.on('close', (code) => {
+      if (code && code !== 143) {
+        const err = new Error(`HSD exited with non-zero exit code ${code}.`);
+        if (err) {
+          this.stopAwaiter.reject(err);
+        } else {
+          throw err;
+        }
+      }
+
+      this.stopAwaiter && this.stopAwaiter.resolve();
+    });
+
+    return this.verifyConnection();
+  }
+
+  stop() {
+    const res = new Promise((resolve, reject) => {
+      this.stopAwaiter = {
+        resolve,
+        reject,
+      };
+    });
+    this.hsd.kill('SIGTERM');
+    return res;
+  }
+}
+
+class RemoteHSD extends HSD {
+  constructor() {
+    super(process.env.TEST_HSD_HOST, process.env.TEST_HSD_API_KEY);
+  }
+
+  start() {
+    if (this.hsd) {
+      return;
+    }
+
+    return this.verifyConnection();
+  }
+
+  async stop() {
+  }
+}
 
 exports.startRegtest = async function () {
   if (hsd) {
     return;
   }
 
-  hsd = spawn(hsdPath, [
-    '--index-tx',
-    '--network=regtest',
-    '--api-key=test',
-    '--log-level=debug',
-  ]);
-  hsd.stdout.on('data', (data) => {
-    if (process.env.SILENCE_HSD) {
-      return;
-    }
-    console.log(`[HSD STDOUT] ${data.toString().trim()}`);
-  });
-  hsd.stderr.on('data', (data) => {
-    if (process.env.SILENCE_HSD) {
-      return;
-    }
-    console.log(`[HSD STDERR] ${data.toString().trim()}`);
-  });
-  hsd.on('close', (code) => {
-    if (code && code !== 143) {
-      const err = new Error(`HSD exited with non-zero exit code ${code}.`);
-      if (err) {
-        stopAwaiter.reject(err);
-      } else {
-        throw err;
-      }
-    }
-
-    stopAwaiter && stopAwaiter.resolve();
-  });
-
-  for (let i = 0; i <= 3; i++) {
-    if (i === 3) {
-      throw new Error('hsd did not start.');
-    }
-
-    try {
-      await nodeClient.getInfo();
-      break;
-    } catch (e) {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-    }
+  if (process.env.TEST_HSD_HOST) {
+    console.log('Starting remote HSD.');
+    hsd = new RemoteHSD();
+  } else {
+    console.log('Starting local HSD.');
+    hsd = new LocalHSD();
   }
 
-  await new Promise((resolve) => setTimeout(resolve, 3000));
+  await hsd.start();
+  nodeClient = hsd.nodeClient;
+  walletClient = hsd.walletClient;
 };
 
 exports.stopRegtest = async function () {
@@ -82,14 +149,8 @@ exports.stopRegtest = async function () {
     throw new Error('HSD is not running.');
   }
 
-  const res = new Promise((resolve, reject) => {
-    stopAwaiter = {
-      resolve,
-      reject,
-    };
-  });
-  hsd.kill('SIGTERM');
-  return res;
+  console.log('Stopping HSD.');
+  await hsd.stop();
 };
 
 exports.mine = async function (n) {
@@ -117,14 +178,16 @@ exports.createAliceBob = async function () {
   const alice = new Context(
     'regtest',
     wids[0],
-    'test',
-    staticPassphraseGetter('password')
+    hsd.apiKey,
+    staticPassphraseGetter('password'),
+    hsd.host,
   );
   const bob = new Context(
     'regtest',
     wids[1],
-    'test',
-    staticPassphraseGetter('password')
+    hsd.apiKey,
+    staticPassphraseGetter('password'),
+    hsd.host,
   );
 
   return {
@@ -181,7 +244,7 @@ exports.sendFinalize = async function (walletId, name) {
 };
 
 exports.setupSwap = async function () {
-  const { alice, bob } = await exports.createAliceBob();
+  const {alice, bob} = await exports.createAliceBob();
   const name = await exports.grindName();
   await exports.sendOpen(alice.walletId, name);
   await exports.mine(8);
