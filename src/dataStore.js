@@ -1,5 +1,8 @@
 const path = require('path');
 const level = require('level');
+const fs = require('fs');
+const inquirer = require('inquirer');
+const { log } = require('./cli/util.js');
 
 class LevelBackend {
   constructor(path) {
@@ -306,8 +309,61 @@ class DataStore {
 
 exports.DataStore = DataStore;
 
-exports.createLevelStore = async function (prefix) {
-  const dbPath = path.join(prefix, 'shakedex.db');
+const migrations = ['initial', 'network_setup'];
+
+exports.migrate = async function (prefix) {
+  let currMigration = path.join(prefix, 'migration');
+  if (!fs.existsSync(currMigration)) {
+    currMigration = 'initial';
+  }
+
+  return exports.executeMigrations(prefix, currMigration);
+};
+
+exports.executeMigrations = async function (prefix, currMigration) {
+  let nextMigration = currMigration;
+
+  switch (currMigration) {
+    case migrations[0]: {
+      const dbPath = path.join(prefix, 'shakedex.db');
+      if (!fs.existsSync(dbPath)) {
+        nextMigration = migrations[1];
+        break;
+      }
+
+      const selectedNetwork = await inquirer.prompt([
+        {
+          type: 'list',
+          name: 'value',
+          message:
+            'In order to support multiple networks, shakedex needs to migrate your name database. Which network did you previously use shakedex with?',
+          choices: ['main', 'simnet', 'regtest', 'testnet'],
+        },
+      ]);
+
+      log(`Running migration ${migrations[0]}`);
+      await fs.promises.rename(
+        dbPath,
+        path.join(prefix, `shakedex.${selectedNetwork.value}.db`)
+      );
+      nextMigration = migrations[1];
+      break;
+    }
+    default:
+      return;
+  }
+
+  await exports.storeMigration(prefix, nextMigration);
+  return exports.executeMigrations(prefix, nextMigration);
+};
+
+exports.storeMigration = async function (prefix, currMigration) {
+  const migrationFile = path.join(prefix, 'migration');
+  await fs.promises.writeFile(migrationFile, currMigration);
+};
+
+exports.createLevelStore = async function (prefix, networkName) {
+  const dbPath = path.join(prefix, `shakedex.${networkName}.db`);
   const levelBackend = new LevelBackend(dbPath);
   await levelBackend.open();
   return new DataStore(levelBackend);
