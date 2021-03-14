@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.10] - 2021-03-13
+### Added
+
+- Added the ability to manage multiple networks at once. Previously, data for names in different networks were commingled in the data store. Now, they exist in their own network-specific subdirectories
+- Added a database migration system to allow the database to be upgraded in the future
+- Added the ability to publish auctions directly to Shakedex Web from a file on disk
+
 ## [0.0.9] - 2021-03-12
 ### Fixed
 
