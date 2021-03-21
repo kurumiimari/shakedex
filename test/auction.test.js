@@ -27,7 +27,7 @@ describe('linearAuctionStrategy', () => {
     assert.deepStrictEqual(pricesLockTimes, [
       { price: 1000000, lockTime: 0 },
       { price: 916667, lockTime: 86400 },
-      { price: 857144, lockTime: 172800 },
+      { price: 833334, lockTime: 172800 },
       { price: 750001, lockTime: 259200 },
       { price: 666668, lockTime: 345600 },
       { price: 583335, lockTime: 432000 },
