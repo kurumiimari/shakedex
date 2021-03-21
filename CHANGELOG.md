@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.11] - 2021-03-21
+### Added
+
+- Added a new docs site
+- Added a `shakedex backup <outFile>` command that backs up the `.shakedex` directory
+
+### Fixed
+
+- Fixed an off-by-one in `linearReductionStrategy`. Closes #16. H/T @brefranz for reporting. 
+
 ## [0.0.10] - 2021-03-13
 ### Added
 
