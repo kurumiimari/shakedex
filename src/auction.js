@@ -1,6 +1,6 @@
-const { SwapProof } = require('./swapProof.js');
-const { coerceAddress } = require('./conversions.js');
-const { coerceBuffer } = require('./conversions.js');
+const {SwapProof} = require('./swapProof.js');
+const {coerceAddress} = require('./conversions.js');
+const {coerceBuffer} = require('./conversions.js');
 const assert = require('assert').strict;
 const readline = require('readline');
 
@@ -9,24 +9,24 @@ function linearReductionStrategy(
   endTime,
   startPrice,
   endPrice,
-  reductionTimeMs
+  reductionTimeMs,
 ) {
-  const timeIncrement = Math.floor((endTime - startTime) / reductionTimeMs);
-  const priceDecrement = Math.floor((startPrice - endPrice) / timeIncrement);
-  let currIncrement = 0;
+  const stepCount = Math.floor((endTime - startTime) / reductionTimeMs);
+  const priceDecrement = Math.floor((startPrice - endPrice) / (stepCount - 1));
+  let currStep = 0;
 
   return () => {
-    if (currIncrement === timeIncrement) {
+    if (currStep === stepCount) {
       return null;
     }
 
     const res = {
-      price: startPrice - priceDecrement * currIncrement,
+      price: startPrice - priceDecrement * currStep,
       lockTime: Math.floor(
-        (startTime + reductionTimeMs * currIncrement) / 1000
+        (startTime + reductionTimeMs * currStep) / 1000,
       ),
     };
-    currIncrement++;
+    currStep++;
     return res;
   };
 }
@@ -45,7 +45,7 @@ class AuctionFactory {
       endPrice,
       reductionTimeMS,
     } = options;
-    let { reductionStrategy } = options;
+    let {reductionStrategy} = options;
 
     assert(typeof startTime === 'number');
     assert(typeof endTime === 'number');
@@ -124,7 +124,7 @@ class AuctionFactory {
       this.endTime,
       this.startPrice,
       this.endPrice,
-      this.reductionTimeMS
+      this.reductionTimeMS,
     );
   }
 
@@ -219,7 +219,7 @@ class Auction {
   async isFulfilled(context) {
     const lockingCoin = await context.nodeClient.getCoin(
       this.lockingTxHash.toString('hex'),
-      this.lockingOutputIdx
+      this.lockingOutputIdx,
     );
     return !lockingCoin;
   }
@@ -246,7 +246,7 @@ class Auction {
           return reject(err);
         }
         resolve();
-      })
+      }),
     );
     await new Promise((resolve, reject) =>
       stream.write(JSON.stringify(this.toJSON(context)), (err) => {
@@ -254,7 +254,7 @@ class Auction {
           return reject(err);
         }
         resolve();
-      })
+      }),
     );
   }
 
