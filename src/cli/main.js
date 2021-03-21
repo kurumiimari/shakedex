@@ -23,6 +23,7 @@ const {finalizeSwap} = require('../swapService.js');
 const {fillSwap} = require('../swapService.js');
 const {format} = require('date-fns');
 const Network = require('hsd/lib/protocol/network.js');
+const {backupDb} = require('../backup.js');
 
 program
   .version(pkg.version)
@@ -105,6 +106,11 @@ program
   .command('list-fills')
   .description('Prints all of your fills and their statuses.')
   .action(listFills);
+
+program
+  .command('backup <outFile>')
+  .description('Backs up the shakedex internal DB.')
+  .action(backup);
 
 program.parse(process.argv);
 
@@ -831,4 +837,11 @@ async function listFills() {
   }
   process.stdout.write(table.toString());
   process.stdout.write('\n');
+}
+
+async function backup(outFile) {
+  const {prefix} = program.opts();
+  log(`Backing up database in ${prefix}.`);
+  await backupDb(prefix, outFile);
+  log('Done.')
 }

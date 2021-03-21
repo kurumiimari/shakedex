@@ -11,22 +11,20 @@ function linearReductionStrategy(
   endPrice,
   reductionTimeMs
 ) {
-  const timeIncrement = Math.floor((endTime - startTime) / reductionTimeMs);
-  const priceDecrement = Math.floor((startPrice - endPrice) / timeIncrement);
-  let currIncrement = 0;
+  const stepCount = Math.floor((endTime - startTime) / reductionTimeMs);
+  const priceDecrement = Math.floor((startPrice - endPrice) / (stepCount - 1));
+  let currStep = 0;
 
   return () => {
-    if (currIncrement === timeIncrement) {
+    if (currStep === stepCount) {
       return null;
     }
 
     const res = {
-      price: startPrice - priceDecrement * currIncrement,
-      lockTime: Math.floor(
-        (startTime + reductionTimeMs * currIncrement) / 1000
-      ),
+      price: startPrice - priceDecrement * currStep,
+      lockTime: Math.floor((startTime + reductionTimeMs * currStep) / 1000),
     };
-    currIncrement++;
+    currStep++;
     return res;
   };
 }
