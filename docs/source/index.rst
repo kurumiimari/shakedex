@@ -20,6 +20,14 @@ If you want to learn about the exchange protocol:
 
    protocol_deep_dive
 
+If you want to read more about ShakeDex's governance:
+
+.. toctree::
+   :name: governance
+   :maxdepth: 1
+
+   community_burn
+
 If you're interested in learning more about the project's history and goals, read on.
 
 Project Goals
