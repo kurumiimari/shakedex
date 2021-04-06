@@ -11,6 +11,7 @@ class SwapFill {
       fulfillmentTxHash,
       lockingPublicKey,
       price,
+      fee,
       broadcastAt,
     } = options;
 
@@ -18,12 +19,16 @@ class SwapFill {
     assert(fulfillmentTxHash && typeof fulfillmentTxHash === 'string');
     assert(price);
     assert(broadcastAt);
+    if (fee) {
+      assert(typeof fee === 'number');
+    }
 
     this.name = name;
     this.fulfillmentTxHash = fulfillmentTxHash;
     this.lockingPublicKey = coerceBuffer(lockingPublicKey);
     this.price = price;
     this.broadcastAt = broadcastAt;
+    this.fee = fee || 0
   }
 
   async getConfirmationDetails(context) {
@@ -46,6 +51,7 @@ class SwapFill {
       fulfillmentTxHash: this.fulfillmentTxHash,
       lockingPublicKey: this.lockingPublicKey.toString('hex'),
       price: this.price,
+      fee: this.fee,
       broadcastAt: this.broadcastAt,
     };
   }

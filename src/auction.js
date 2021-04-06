@@ -29,7 +29,7 @@ function linearReductionStrategy(
   };
 }
 
-linearReductionStrategy.name = 'LINEAR';
+linearReductionStrategy.strategyName = 'LINEAR';
 
 exports.linearReductionStrategy = linearReductionStrategy;
 
@@ -42,6 +42,8 @@ class AuctionFactory {
       startPrice,
       endPrice,
       reductionTimeMS,
+      feeRate,
+      feeAddr,
     } = options;
     let { reductionStrategy } = options;
 
@@ -53,11 +55,15 @@ class AuctionFactory {
     assert(endPrice > 0 && startPrice > endPrice);
     assert(typeof reductionTimeMS === 'number');
     assert(reductionTimeMS > 0);
+    assert(typeof feeRate === 'number' && feeRate >= 0 && feeRate <= 10000);
+    if (feeRate > 0 && !feeAddr) {
+      throw new Error('Must specify a fee address if feeRate > 0.');
+    }
 
     if (typeof reductionStrategy === 'string') {
       let actualReductionStrategy;
       switch (reductionStrategy) {
-        case linearReductionStrategy.name:
+        case linearReductionStrategy.strategyName:
           actualReductionStrategy = linearReductionStrategy;
           break;
         default:
@@ -75,6 +81,8 @@ class AuctionFactory {
     this.endPrice = endPrice;
     this.reductionTimeMS = reductionTimeMS;
     this.reductionStrategy = reductionStrategy;
+    this.feeRate = feeRate;
+    this.feeAddr = feeAddr ? coerceAddress(feeAddr) : null;
   }
 
   async createAuction(context, lockFinalize, paymentAddr = null) {
@@ -86,6 +94,7 @@ class AuctionFactory {
     let info = strategy();
     const data = [];
     while (info) {
+      const fee = Math.floor((this.feeRate / 10000) * info.price);
       const swapProof = new SwapProof({
         lockingTxHash: lockFinalize.finalizeTxHash,
         lockingOutputIdx: lockFinalize.finalizeOutputIdx,
@@ -94,11 +103,14 @@ class AuctionFactory {
         paymentAddr,
         price: info.price,
         lockTime: info.lockTime,
+        feeAddr: this.feeAddr,
+        fee,
       });
       await swapProof.sign(context, lockFinalize.privateKey);
 
       data.push({
         price: info.price,
+        fee,
         lockTime: info.lockTime,
         signature: swapProof.signature,
       });
@@ -113,6 +125,7 @@ class AuctionFactory {
       publicKey: lockFinalize.publicKey,
       paymentAddr,
       data,
+      feeAddr: this.feeAddr,
     });
   }
 
@@ -126,7 +139,7 @@ class AuctionFactory {
     );
   }
 
-  toJSON() {
+  toJSON(context) {
     return {
       name: this.name,
       startTime: this.startTime,
@@ -135,6 +148,7 @@ class AuctionFactory {
       endPrice: this.endPrice,
       reductionTimeMS: this.reductionTimeMS,
       reductionStrategy: this.reductionStrategy.name,
+      feeAddr: this.feeAddr ? this.feeAddr.toString(context.networkName) : null,
     };
   }
 }
@@ -152,6 +166,7 @@ class Auction {
       publicKey,
       paymentAddr,
       data,
+      feeAddr,
     } = options;
 
     this.name = name;
@@ -159,12 +174,14 @@ class Auction {
     this.lockingOutputIdx = lockingOutputIdx;
     this.publicKey = coerceBuffer(publicKey);
     this.paymentAddr = coerceAddress(paymentAddr);
+    this.feeAddr = feeAddr ? coerceAddress(feeAddr) : null;
 
     this.data = [];
     for (const datum of data) {
       this.data.push({
         price: datum.price,
         lockTime: datum.lockTime,
+        fee: datum.fee || 0,
         signature: coerceBuffer(datum.signature),
       });
     }
@@ -199,6 +216,8 @@ class Auction {
       price: datum.price,
       lockTime: datum.lockTime,
       signature: datum.signature,
+      fee: datum.fee,
+      feeAddr: this.feeAddr,
     });
   }
 
@@ -229,9 +248,11 @@ class Auction {
       lockingOutputIdx: this.lockingOutputIdx,
       publicKey: this.publicKey.toString('hex'),
       paymentAddr: this.paymentAddr.toString(context.networkName),
+      feeAddr: this.feeAddr ? this.feeAddr.toString(context.networkName) : null,
       data: this.data.map((d) => ({
         price: d.price,
         lockTime: d.lockTime,
+        fee: d.fee,
         signature: d.signature.toString('hex'),
       })),
     };

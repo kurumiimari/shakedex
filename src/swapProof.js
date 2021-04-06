@@ -23,6 +23,8 @@ class SwapProof {
       price,
       lockTime,
       signature,
+      feeAddr,
+      fee,
     } = options;
     assert(
       typeof lockingOutputIdx === 'number' && lockingOutputIdx >= 0,
@@ -31,6 +33,9 @@ class SwapProof {
     assert(rules.verifyName(name));
     assert(typeof price === 'number' && price > 0, 'Invalid price.');
     assert(typeof lockTime === 'number' && lockTime >= 0, 'Invalid lock time.');
+    if (fee) {
+      assert(typeof fee == 'number' && fee >= 0, 'Invalid fee.');
+    }
 
     this.lockingTxHash = coerceBuffer(lockingTxHash);
     this.lockingOutputIdx = lockingOutputIdx;
@@ -40,6 +45,8 @@ class SwapProof {
     this.price = price;
     this.lockTime = lockTime;
     this.signature = signature ? coerceBuffer(signature) : null;
+    this.fee = fee || 0;
+    this.feeAddr = feeAddr ? coerceAddress(feeAddr) : null;
   }
 
   async toMTX(context) {
@@ -62,6 +69,12 @@ class SwapProof {
         },
       })
     );
+    if (this.fee > 0) {
+      mtx.addOutput({
+        address: this.feeAddr,
+        value: this.fee,
+      });
+    }
     mtx.addOutput(
       new Output({
         address: this.paymentAddr,
@@ -108,7 +121,6 @@ class SwapProof {
     try {
       mtx.checkInput(0, this._lockScriptCoin, ANYONECANPAY | SINGLEREVERSE);
     } catch (e) {
-      console.error(e);
       return false;
     }
 
@@ -146,6 +158,8 @@ class SwapProof {
     const outputs = mtx.outputs;
     if (outputs.length === 3) {
       mtx.outputs = [outputs[0], outputs[2], outputs[1]];
+    } else if (outputs.length === 4) {
+      mtx.outputs = [outputs[0], outputs[1], outputs[3], outputs[2]];
     }
 
     // sanity check
@@ -170,6 +184,8 @@ class SwapProof {
       price: this.price,
       lockTime: this.lockTime,
       signature: this.signature ? this.signature.toString('hex') : null,
+      fee: this.fee,
+      feeAddr: this.feeAddr ? this.feeAddr.toString(context.networkName) : null,
     };
   }
 }

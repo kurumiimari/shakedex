@@ -23,7 +23,13 @@ const {finalizeSwap} = require('../swapService.js');
 const {fillSwap} = require('../swapService.js');
 const {format} = require('date-fns');
 const Network = require('hsd/lib/protocol/network.js');
+const {getPostFeeInfo} = require('../swapService.js');
 const {backupDb} = require('../backup.js');
+
+const DEFAULT_FEE_INFO = {
+  rate: 0,
+  addr: null,
+};
 
 program
   .version(pkg.version)
@@ -42,7 +48,7 @@ program
   .option(
     '--shakedex-web-host <shakedexWebHost>',
     'Shakedex web hostname.',
-    'www.shakedex.com',
+    'https://api.shakedex.com',
   )
   .option('--no-passphrase', 'Disable prompts for the wallet passphrase.');
 
@@ -126,7 +132,7 @@ function getContext(opts) {
     opts.network,
     opts.walletId,
     opts.apiKey,
-    opts.noPassphrase ? staticPassphraseGetter('') : promptPassphraseGetter(),
+    opts.passphrase ? promptPassphraseGetter() : staticPassphraseGetter(null),
   );
 }
 
@@ -162,7 +168,7 @@ async function setupCLI() {
   return out;
 }
 
-async function confirm(message) {
+async function confirm(message, shouldDie = true) {
   const answers = await inquirer.prompt([
     {
       type: 'confirm',
@@ -171,9 +177,11 @@ async function confirm(message) {
     },
   ]);
 
-  if (!answers.confirmed) {
+  if (shouldDie && !answers.confirmed) {
     die('Cancelled.');
   }
+
+  return answers.confirmed;
 }
 
 async function transferLock(name) {
@@ -328,25 +336,17 @@ async function createAuction(name) {
     );
   }
 
-  const {outPath, auction} = await promptAuctionParameters(
+  const {outPath, auction, shouldPost} = await promptAuctionParameters(
     db,
     context,
     finalize,
+    shakedexWebHost,
   );
 
   const stream = fs.createWriteStream(outPath);
   await auction.writeToStream(context, stream);
 
-  const shouldPostAnswer = await inquirer.prompt([
-    {
-      type: 'confirm',
-      name: 'shouldPost',
-      message: `Would you like to publish your auction to Shakedex Web at ${shakedexWebHost}?`,
-      default: true,
-    },
-  ]);
-
-  if (shouldPostAnswer.shouldPost) {
+  if (shouldPost) {
     try {
       await postAuction(context, auction, shakedexWebHost);
     } catch (e) {
@@ -385,7 +385,7 @@ async function publishAuction(auctionFile) {
   log(`Link: https://${opts.shakedexWebHost}/a/${auction.name}`);
 }
 
-async function promptAuctionParameters(db, context, finalize) {
+async function promptAuctionParameters(db, context, finalize, shakedexWebHost) {
   const {name} = finalize;
 
   const answers = await inquirer.prompt([
@@ -432,6 +432,12 @@ async function promptAuctionParameters(db, context, finalize) {
       name: 'outPath',
       message: 'Where would you like to store your auction presigns?',
     },
+    {
+      type: 'confirm',
+      name: 'shouldPost',
+      message: `Would you like to publish your auction to Shakedex Web at ${shakedexWebHost}?`,
+      default: true,
+    },
   ]);
 
   const durationDays = Number(answers.duration.split(' ')[0]);
@@ -462,6 +468,31 @@ async function promptAuctionParameters(db, context, finalize) {
     outPath = outPath.replace('~', process.env.HOME);
   }
 
+  let feeInfo = DEFAULT_FEE_INFO;
+  let shouldPost = answers.shouldPost;
+
+  if (shouldPost) {
+    try {
+      feeInfo = await getPostFeeInfo(context, shakedexWebHost);
+    } catch (e) {
+      log('An error occurred while getting fee info; not posting to Shakedex Web.');
+    }
+
+    if (feeInfo.rate !== 0) {
+      const feeOk = await confirm(
+        `The ShakeDex Web host at ${shakedexWebHost} charges a fee of ${feeInfo.rate / 100}%. Is this OK? ` +
+        `Buyers will pay this fee. If you decline, your auction's presigns will still be generated with ` +
+        `a fee of zero. They will not be uploaded to the auction site.`,
+        false,
+      );
+
+      if (!feeOk) {
+        feeInfo = DEFAULT_FEE_INFO;
+        shouldPost = false;
+      }
+    }
+  }
+
   const auctionFactory = new AuctionFactory({
     name,
     startTime: Date.now(),
@@ -470,17 +501,20 @@ async function promptAuctionParameters(db, context, finalize) {
     endPrice: endPrice * 1e6,
     reductionTimeMS,
     reductionStrategy: linearReductionStrategy,
+    feeRate: feeInfo.rate,
+    feeAddr: feeInfo.addr,
   });
 
   const auction = await auctionFactory.createAuction(context, finalize);
 
   log(`Please confirm your auction's pricing parameters below.`);
   const table = new Table({
-    head: ['Price', 'Unlocks At'],
+    head: ['Price', 'Fee', 'Unlocks At'],
   });
   for (const datum of auction.data) {
     table.push([
       (datum.price / 1e6).toFixed(6),
+      (datum.fee / 1e6).toFixed(6),
       format(new Date(datum.lockTime * 1000), 'MM/dd/yyyy HH:MM:SS'),
     ]);
   }
@@ -492,16 +526,16 @@ async function promptAuctionParameters(db, context, finalize) {
     {
       type: 'confirm',
       name: 'paramsOk',
-      message: 'Do these auction pricing parameters looks ok?',
+      message: 'Do these auction pricing parameters look ok?',
       default: true,
     },
   ]);
 
   if (!paramsOkAnswer.paramsOk) {
-    return promptAuctionParameters(db, context, finalize);
+    return promptAuctionParameters(db, context, finalize, shakedexWebHost);
   }
 
-  return {outPath, auction};
+  return {outPath, auction, shouldPost};
 }
 
 async function listAuctions() {
@@ -723,6 +757,9 @@ async function fillAuction(auctionPath) {
     {
       Price: `${(bestBid.price / 1e6).toFixed(6)} HNS`,
     },
+    {
+      Fee: `${(bestBid.fee / 1e6).toFixed(6)}`
+    }
   );
   process.stdout.write(table.toString());
   process.stdout.write('\n');
@@ -777,6 +814,7 @@ async function listFills() {
       'Confirmed',
       'Lockup',
       'Price',
+      'Fee',
       'Broadcast At',
       'Confirmed At',
     ],
@@ -807,6 +845,7 @@ async function listFills() {
             : `${confirmation.spendableIn} BLOCKS`
             : '-',
           (fill.price / 1e6).toFixed(6),
+          (fill.fee / 1e6).toFixed(6),
           format(new Date(fill.broadcastAt), 'MM/dd/yyyy HH:MM:SS'),
           confirmation.confirmedAt
             ? format(new Date(confirmation.confirmedAt), 'MM/dd/yyyy HH:MM:SS')
@@ -826,6 +865,7 @@ async function listFills() {
           confirmation.confirmedAt ? 'YES' : 'NO',
           '-',
           (fill.price / 1e6).toFixed(6),
+          (fill.fee / 1e6).toFixed(6),
           format(new Date(finalize.broadcastAt), 'MM/dd/yyyy HH:MM:SS'),
           confirmation.confirmedAt
             ? format(new Date(confirmation.confirmedAt), 'MM/dd/yyyy HH:MM:SS')
@@ -843,5 +883,5 @@ async function backup(outFile) {
   const {prefix} = program.opts();
   log(`Backing up database in ${prefix}.`);
   await backupDb(prefix, outFile);
-  log('Done.')
+  log('Done.');
 }

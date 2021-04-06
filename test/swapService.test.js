@@ -15,6 +15,7 @@ const { createLockScript } = require('../src/script.js');
 const secp256k1 = require('bcrypto/lib/secp256k1.js');
 const common = require('hsd/lib/script/common.js');
 const Witness = require('hsd/lib/script/witness.js');
+const { generateAddress } = require('./hsd.js');
 const { finalizeNameLockCancel } = require('../src/swapService.js');
 const { transferNameLockCancel } = require('../src/swapService.js');
 
@@ -24,77 +25,102 @@ const { SINGLEREVERSE, ANYONECANPAY } = common.hashType;
 describe('Swap service', () => {
   let alice;
   let bob;
+  let charlie;
   let name;
   let transferLock;
   let finalizeLock;
+  let feeAddr;
 
   beforeEach(async () => {
     const setupRes = await setupSwap();
     alice = setupRes.alice;
     bob = setupRes.bob;
+    charlie = setupRes.charlie;
     name = setupRes.name;
     transferLock = setupRes.transferLock;
     finalizeLock = setupRes.finalizeLock;
+    feeAddr = (await generateAddress(charlie.walletId)).address;
   });
 
-  describe('end-to-end', () => {
-    let aliceStartBalance;
-    let bobStartBalance;
-    let swapProof;
-    let fill;
+  for (const fee of [0, 10]) {
+    describe(`end-to-end (${fee} fee)`, () => {
+      let aliceStartBalance;
+      let bobStartBalance;
+      let charlieStartBalance;
+      let swapProof;
+      let fill;
 
-    beforeEach(async () => {
-      aliceStartBalance = await alice.wallet.getBalance('default');
-      bobStartBalance = await bob.wallet.getBalance('default');
-      swapProof = await proposeSwap(alice, finalizeLock, 10 * 1e6);
-      fill = await fillSwap(bob, swapProof);
-      await mine(10);
-      await finalizeSwap(bob, fill);
-      await mine(1);
-    });
+      beforeEach(async () => {
+        aliceStartBalance = await alice.wallet.getBalance('default');
+        bobStartBalance = await bob.wallet.getBalance('default');
+        charlieStartBalance = await charlie.wallet.getBalance('default');
+        swapProof = await proposeSwap(
+          alice,
+          finalizeLock,
+          10 * 1e6,
+          0,
+          null,
+          fee * 1e6,
+          feeAddr
+        );
+        fill = await fillSwap(bob, swapProof);
+        await mine(10);
+        await finalizeSwap(bob, fill);
+        await mine(1);
+      });
 
-    it("should pay Alice from Bob's wallet", async () => {
-      const aliceBalance = await alice.wallet.getBalance('default');
-      const bobBalance = await bob.wallet.getBalance('default');
-      assert.isAtLeast(
-        aliceBalance.confirmed - aliceStartBalance.confirmed,
-        9 * 1e6
-      );
-      assert.isAtMost(
-        bobStartBalance.confirmed - bobBalance.confirmed,
-        11 * 1e6
-      );
-    });
+      it("should pay Alice from Bob's wallet", async () => {
+        const aliceBalance = await alice.wallet.getBalance('default');
+        const bobBalance = await bob.wallet.getBalance('default');
+        assert.isAtLeast(
+          aliceBalance.confirmed - aliceStartBalance.confirmed,
+          9 * 1e6
+        );
+        assert.isAtMost(
+          bobStartBalance.confirmed - bobBalance.confirmed - fee * 1e6,
+          11 * 1e6
+        );
+      });
 
-    it('should transfer ownership of the name to Bob', async () => {
-      await sendUpdate(bob.walletId, name, {
-        records: [
+      it('should pay Charlie the necessary fee', async () => {
+        const charlieBalance = await charlie.wallet.getBalance('default');
+
+        assert.isAtLeast(
+          charlieBalance.confirmed - charlieStartBalance.confirmed,
+          fee * 1e6
+        );
+      });
+
+      it('should transfer ownership of the name to Bob', async () => {
+        await sendUpdate(bob.walletId, name, {
+          records: [
+            {
+              type: 'NS',
+              ns: 'bob.com.',
+            },
+          ],
+        });
+        await mine(1);
+        const resource = await bob.wallet.getResource(name);
+        assert.deepStrictEqual(resource.records, [
           {
             type: 'NS',
             ns: 'bob.com.',
           },
-        ],
+        ]);
+        await assert.isRejected(
+          sendUpdate(alice.walletId, name, {
+            records: [
+              {
+                type: 'NS',
+                ns: 'alice.com.',
+              },
+            ],
+          })
+        );
       });
-      await mine(1);
-      const resource = await bob.wallet.getResource(name);
-      assert.deepStrictEqual(resource.records, [
-        {
-          type: 'NS',
-          ns: 'bob.com.',
-        },
-      ]);
-      await assert.isRejected(
-        sendUpdate(alice.walletId, name, {
-          records: [
-            {
-              type: 'NS',
-              ns: 'alice.com.',
-            },
-          ],
-        })
-      );
     });
-  });
+  }
 });
 
 describe('finalizeNameLock', () => {

@@ -21,6 +21,7 @@ const { NameLockCancelFinalize } = require('./nameLock.js');
 const { createFinalize } = require('./utils.js');
 const { NameLockCancelTransfer } = require('./nameLock.js');
 const { Client } = require('bcurl');
+const fetch = require('node-fetch');
 
 const assert = assertModule.strict;
 const { ALL, ANYONECANPAY, SINGLE } = common.hashType;
@@ -158,7 +159,9 @@ exports.proposeSwap = async function (
   lockFinalize,
   price,
   lockTime = 0,
-  paymentAddr = null
+  paymentAddr = null,
+  fee = 0,
+  feeAddr = null
 ) {
   const { wallet } = context;
   paymentAddr = paymentAddr || (await wallet.createAddress('default')).address;
@@ -170,6 +173,8 @@ exports.proposeSwap = async function (
     paymentAddr,
     price,
     lockTime,
+    fee,
+    feeAddr,
   });
   await swapProof.sign(context, lockFinalize.privateKey);
   return swapProof;
@@ -188,6 +193,7 @@ exports.fillSwap = async function (context, swapProof) {
     fulfillmentTxHash: mtx.toJSON().hash,
     lockingPublicKey: swapProof.publicKey,
     price: swapProof.price,
+    fee: swapProof.fee,
     broadcastAt: Date.now(),
   });
 };
@@ -221,17 +227,41 @@ exports.finalizeSwap = async function (context, fulfillment) {
   });
 };
 
+exports.getPostFeeInfo = async function (
+  context,
+  shakedexWebHost = 'https://api.shakedex.com'
+) {
+  const res = await fetch(`${shakedexWebHost}/api/v1/fee_info`);
+  if (res.status === 404) {
+    return {
+      rate: 0,
+      addr: null,
+    };
+  }
+  if (!res.ok) {
+    throw new Error('Error getting ShakeDex Web fee rate.');
+  }
+
+  return res.json();
+};
+
 exports.postAuction = async function (
   context,
   auction,
-  shakedexWebHost = 'www.shakedex.com'
+  shakedexWebHost = 'https://api.shakedex.com'
 ) {
-  const client = new Client({
-    host: shakedexWebHost,
-    ssl: true,
+  const res = await fetch(`${shakedexWebHost}/api/v1/auctions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      auction: auction.toJSON(context),
+    }),
   });
+  if (!res.ok) {
+    throw new Error(`Error uploading presigns to ShakeDex web: ${res.status}`);
+  }
 
-  await client.post('api/v1/auctions', {
-    auction: auction.toJSON(context),
-  });
+  return res.json();
 };
