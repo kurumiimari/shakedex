@@ -28,7 +28,7 @@ class SwapFill {
     this.lockingPublicKey = coerceBuffer(lockingPublicKey);
     this.price = price;
     this.broadcastAt = broadcastAt;
-    this.fee = fee || 0
+    this.fee = fee || 0;
   }
 
   async getConfirmationDetails(context) {
