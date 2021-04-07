@@ -167,6 +167,7 @@ exports.createAliceBob = async function () {
   const wids = [
     `test-wallet-${Date.now()}-alice`,
     `test-wallet-${Date.now()}-bob`,
+    `test-wallet-${Date.now()}-charlie`,
   ];
   for (const wid of wids) {
     await exports.createWallet(wid, 'password');
@@ -189,10 +190,18 @@ exports.createAliceBob = async function () {
     staticPassphraseGetter('password'),
     hsd.host
   );
+  const charlie = new Context(
+    'regtest',
+    wids[2],
+    hsd.apiKey,
+    staticPassphraseGetter('password'),
+    hsd.host
+  );
 
   return {
     alice,
     bob,
+    charlie,
   };
 };
 
@@ -244,7 +253,7 @@ exports.sendFinalize = async function (walletId, name) {
 };
 
 exports.setupSwap = async function () {
-  const { alice, bob } = await exports.createAliceBob();
+  const { alice, bob, charlie } = await exports.createAliceBob();
   const name = await exports.grindName();
   await exports.sendOpen(alice.walletId, name);
   await exports.mine(8);
@@ -271,6 +280,7 @@ exports.setupSwap = async function () {
   return {
     alice,
     bob,
+    charlie,
     name,
     transferLock,
     finalizeLock,
