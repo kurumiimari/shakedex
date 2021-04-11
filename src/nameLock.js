@@ -122,6 +122,73 @@ class NameLockFinalize {
 
 exports.NameLockFinalize = NameLockFinalize;
 
+class NameLockExternalTransfer {
+  constructor(options) {
+    const { name, privateKey, createdAt } = options;
+
+    assert(rules.verifyName(name));
+    this.name = name;
+    this.privateKey = coerceBuffer(privateKey);
+    this.createdAt = createdAt;
+  }
+
+  get lockScriptAddr() {
+    const script = createLockScript(secp256k1.publicKeyCreate(this.privateKey));
+    return new Address().fromScript(script);
+  }
+
+  get publicKey() {
+    return secp256k1.publicKeyCreate(this.privateKey);
+  }
+
+  async getConfirmationDetails(context) {
+    const lockAddrStr = this.lockScriptAddr.toString(context.networkName);
+    const txs = await context.nodeClient.getTXByAddress(lockAddrStr);
+    if (!txs.length) {
+      return {
+        status: 'WAITING',
+      };
+    }
+
+    let foundTx = null;
+    let foundTxIdx = -1;
+    for (const tx of txs) {
+      for (let i = 0; i < tx.outputs.length; i++) {
+        const out = tx.outputs[i];
+        if (out.address === lockAddrStr) {
+          foundTx = tx;
+          foundTxIdx = i;
+          break;
+        }
+      }
+    }
+
+    if (!foundTx) {
+      return {
+        status: 'WAITING',
+      };
+    }
+
+    return {
+      confirmedAt: foundTx.mtime * 1000,
+      finalizeTxHash: foundTx.hash,
+      finalizeOutputIdx: foundTxIdx,
+      status: 'CONFIRMED',
+    };
+  }
+
+  toJSON() {
+    return {
+      name: this.name,
+      privateKey: this.privateKey.toString('hex'),
+      publicKey: this.publicKey.toString('hex'),
+      lockScriptAddr: this.lockScriptAddr,
+    };
+  }
+}
+
+exports.NameLockExternalTransfer = NameLockExternalTransfer;
+
 class NameLockCancelTransfer {
   constructor(options) {
     const {

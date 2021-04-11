@@ -65,6 +65,7 @@ class LocalHSD extends HSD {
 
     const hsd = spawn(hsdPath, [
       '--index-tx',
+      '--index-address',
       '--network=regtest',
       `--api-key=${this.apiKey}`,
       '--log-level=debug',
@@ -252,9 +253,7 @@ exports.sendFinalize = async function (walletId, name) {
   return walletClient.execute('sendfinalize', [name]);
 };
 
-exports.setupSwap = async function () {
-  const { alice, bob, charlie } = await exports.createAliceBob();
-  const name = await exports.grindName();
+exports.buyName = async function (alice, name) {
   await exports.sendOpen(alice.walletId, name);
   await exports.mine(8);
   await exports.sendBid(alice.walletId, name, 1, 2);
@@ -272,6 +271,12 @@ exports.setupSwap = async function () {
     ],
   });
   await exports.mine(1);
+};
+
+exports.setupSwap = async function () {
+  const { alice, bob, charlie } = await exports.createAliceBob();
+  const name = await exports.grindName();
+  await exports.buyName(alice, name);
   const transferLock = await transferNameLock(alice, name);
   await exports.mine(10);
   const finalizeLock = await finalizeNameLock(alice, transferLock);
