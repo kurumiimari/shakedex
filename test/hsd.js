@@ -173,7 +173,7 @@ exports.createAliceBob = async function () {
   for (const wid of wids) {
     await exports.createWallet(wid, 'password');
     const addr = await exports.generateAddress(wid);
-    await exports.generateToAddress(addr.address, 20);
+    await exports.generateToAddress(addr.address, 30);
   }
   await exports.mine(10);
 
