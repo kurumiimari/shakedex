@@ -23,6 +23,8 @@ const {finalizeSwap} = require('../swapService.js');
 const {fillSwap} = require('../swapService.js');
 const {format} = require('date-fns');
 const Network = require('hsd/lib/protocol/network.js');
+const {NameLockExternalTransfer} = require('../nameLock.js');
+const {createNameLockExternal} = require('../swapService.js');
 const {getPostFeeInfo} = require('../swapService.js');
 const {backupDb} = require('../backup.js');
 
@@ -51,6 +53,21 @@ program
     'https://api.shakedex.com',
   )
   .option('--no-passphrase', 'Disable prompts for the wallet passphrase.');
+
+program
+  .command('create-external-lock <name>')
+  .description(
+    'Creates an address to directly finalize a name transfer to.',
+  )
+  .action(createExternalLock);
+
+program
+  .command('external-lock-details <name>')
+  .description(
+    'Prints details about an external lock.',
+  )
+  .action(viewExternalLock);
+
 
 program
   .command('transfer-lock <name>')
@@ -184,6 +201,56 @@ async function confirm(message, shouldDie = true) {
   return answers.confirmed;
 }
 
+async function createExternalLock(name) {
+  const {db, context} = await setupCLI();
+
+  await confirm(
+    `This command will create an address for a third party to transfer your name to.`,
+  );
+
+  log('Creating external locking addr.');
+  const lock = await createNameLockExternal(context, name);
+  await db.putLockExternalTransfer(lock);
+  log('Locking address successfully created. Give the following address to whoever holds your name:');
+  log(lock.lockScriptAddr.toString(context.networkName));
+}
+
+async function viewExternalLock(name) {
+  const {db, context} = await setupCLI();
+
+  const extLockJSON = await db.getLockExternalTransfer(name);
+  if (!extLockJSON) {
+    throw new Error(
+      `Lock info for ${name} was not found.`,
+    );
+  }
+  const extTransfer = new NameLockExternalTransfer(extLockJSON);
+  const confirmation = await extTransfer.getConfirmationDetails(context);
+
+  const table = new Table();
+  table.push(
+    {
+      Name: extTransfer.name,
+    },
+    {
+      'Locking Address': extTransfer.lockScriptAddr.toString(context.networkName),
+    },
+    {
+      'Confirmed At': confirmation.confirmedAt
+        ? format(new Date(confirmation.confirmedAt), 'MM/dd/yyyy HH:MM:SS')
+        : '-',
+    },
+    {
+      'Finalize TX Hash': confirmation.confirmedAt ? confirmation.finalizeTxHash : '-',
+    },
+    {
+      'Finalize Output Idx': confirmation.confirmedAt ? confirmation.finalizeOutputIdx : '-',
+    },
+  );
+  process.stdout.write(table.toString());
+  process.stdout.write('\n');
+}
+
 async function transferLock(name) {
   const {db, context} = await setupCLI();
 
@@ -309,9 +376,10 @@ async function createAuction(name) {
   if (nameState === null) {
     die(`Name ${name} not found.`);
   }
-  if (nameState !== 'FINALIZE' && nameState !== 'AUCTION') {
-    die(`Name ${name} is not in the FINALIZE or AUCTION state.`);
+  if (nameState !== 'EXTERNAL_TRANSFER' && nameState !== 'FINALIZE' && nameState !== 'AUCTION') {
+    die(`Name ${name} is not in the EXTERNAL_TRANSFER, FINALIZE, or AUCTION state.`);
   }
+
   if (nameState === 'AUCTION') {
     const overwriteOkAnswer = await inquirer.prompt([
       {
@@ -327,13 +395,32 @@ async function createAuction(name) {
     }
   }
 
-  const finalizeJSON = await db.getLockFinalize(name);
-  const finalize = new NameLockFinalize(finalizeJSON);
-  const confirmation = await finalize.getConfirmationDetails(context);
-  if (!confirmation.confirmedAt) {
-    die(
-      `The transaction finalizing ${name} to the locking script is unconfirmed. Please try again later.`,
-    );
+  let finalize;
+  if (nameState === 'EXTERNAL_TRANSFER') {
+    const extTransferJSON = await db.getLockExternalTransfer(name);
+    const extTransfer = new NameLockExternalTransfer(extTransferJSON);
+    const confirmation = await extTransfer.getConfirmationDetails(context);
+    if (!confirmation.confirmedAt) {
+      die(
+        `The transaction finalizing ${name} to the locking script is unconfirmed. Please try again later.`,
+      );
+    }
+    finalize = new NameLockFinalize({
+      name: extTransfer.name,
+      finalizeTxHash: confirmation.finalizeTxHash,
+      finalizeOutputIdx: confirmation.finalizeOutputIdx,
+      privateKey: extTransfer.privateKey,
+      broadcastAt: confirmation.confirmedAt,
+    });
+  } else {
+    const finalizeJSON = await db.getLockFinalize(name);
+    finalize = new NameLockFinalize(finalizeJSON);
+    const confirmation = await finalize.getConfirmationDetails(context);
+    if (!confirmation.confirmedAt) {
+      die(
+        `The transaction finalizing ${name} to the locking script is unconfirmed. Please try again later.`,
+      );
+    }
   }
 
   const {outPath, auction, shouldPost} = await promptAuctionParameters(
@@ -564,6 +651,23 @@ async function listAuctions() {
     const state = await db.getOutboundNameState(name, version);
 
     switch (state) {
+      case 'EXTERNAL_TRANSFER': {
+        const transfer = new NameLockExternalTransfer(
+          await db.getLockExternalTransfer(name, version),
+        );
+        const confirmation = await transfer.getConfirmationDetails(context);
+        table.push([
+          name,
+          `EXTERNAL_TRANSFER_${confirmation.status}`,
+          confirmation.status === 'CONFIRMED' ? 'YES' : 'NO',
+          'N/A',
+          'N/A',
+          confirmation.confirmedAt
+            ? format(new Date(confirmation.confirmedAt), 'MM/dd/yyyy HH:MM:SS')
+            : '-',
+        ]);
+        break;
+      }
       case 'TRANSFER': {
         const transfer = new NameLockTransfer(
           await db.getLockTransfer(name, version),
@@ -758,8 +862,8 @@ async function fillAuction(auctionPath) {
       Price: `${(bestBid.price / 1e6).toFixed(6)} HNS`,
     },
     {
-      Fee: `${(bestBid.fee / 1e6).toFixed(6)}`
-    }
+      Fee: `${(bestBid.fee / 1e6).toFixed(6)}`,
+    },
   );
   process.stdout.write(table.toString());
   process.stdout.write('\n');

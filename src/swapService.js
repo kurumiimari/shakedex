@@ -20,11 +20,20 @@ const { coerceCoin } = require('./conversions.js');
 const { NameLockCancelFinalize } = require('./nameLock.js');
 const { createFinalize } = require('./utils.js');
 const { NameLockCancelTransfer } = require('./nameLock.js');
-const { Client } = require('bcurl');
 const fetch = require('node-fetch');
+const { NameLockExternalTransfer } = require('./nameLock.js');
 
 const assert = assertModule.strict;
 const { ALL, ANYONECANPAY, SINGLE } = common.hashType;
+
+exports.createNameLockExternal = async function (context, name) {
+  const privateKey = secp256k1.privateKeyGenerate();
+  return new NameLockExternalTransfer({
+    name,
+    privateKey,
+    createdAt: Date.now(),
+  });
+};
 
 exports.transferNameLock = async function (context, name) {
   const privateKey = secp256k1.privateKeyGenerate();

@@ -123,6 +123,38 @@ class DataStore {
     return this.backend.get(`names/inbound/state/${name}/${version}`);
   }
 
+  async putLockExternalTransfer(externalTransfer) {
+    const currVersion = await this.getOutboundNameVersion(
+      externalTransfer.name
+    );
+    const newVersion = currVersion + 1;
+    return this.backend
+      .batch()
+      .put(`names/outbound/list/${externalTransfer.name}`, newVersion)
+      .put(
+        `names/outbound/state/${externalTransfer.name}/${newVersion}`,
+        'EXTERNAL_TRANSFER'
+      )
+      .putJSON(
+        `names/locks/external_transfers/${externalTransfer.name}/${newVersion}`,
+        externalTransfer.toJSON()
+      )
+      .commit();
+  }
+
+  async getLockExternalTransfer(name, version = -1) {
+    if (version === -1) {
+      version = await this.getOutboundNameVersion(name);
+    }
+    if (version === null) {
+      return null;
+    }
+
+    return this.backend.getJSON(
+      `names/locks/external_transfers/${name}/${version}`
+    );
+  }
+
   async putLockTransfer(lockTransfer) {
     const currVersion = await this.getOutboundNameVersion(lockTransfer.name);
     const newVersion = currVersion + 1;
