@@ -19,16 +19,15 @@ exports.fundMtx = async function (context, mtx, additionalCoin = null) {
 
   const coinsJSON = await wallet.getCoins('default');
   const coins = coinsJSON.map((c) => new Coin().fromJSON(c));
-  const unlockedCoins = coins.filter(
-    (c) => info.blocks - c.height > network.coinbaseMaturity
-  );
   if (additionalCoin) {
-    unlockedCoins.push(additionalCoin);
+    coins.push(additionalCoin);
   }
   const changeAddress = (await wallet.createChange('default')).address;
-  await mtx.fund(unlockedCoins, {
+  await mtx.fund(coins, {
     rate,
     changeAddress,
+    height: info.blocks,
+    coinbaseMaturity: network.coinbaseMaturity,
   });
   return mtx;
 };

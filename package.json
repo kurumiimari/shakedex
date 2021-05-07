@@ -1,6 +1,6 @@
 {
   "name": "shakedex",
-  "version": "0.0.13",
+  "version": "0.0.14",
   "description": "A decentralized exchange for Handshake names.",
   "main": "src/cli/index.js",
   "bin": {
