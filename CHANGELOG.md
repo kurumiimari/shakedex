@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Fixed a bug that prevented funding auction transactions with non-coinbase transactions less than `coinbaseMaturity` blocks old
-a
+
 ## [0.0.13] - 2021-04-11
 ### Added
 
