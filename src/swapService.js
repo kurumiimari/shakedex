@@ -35,8 +35,8 @@ exports.createNameLockExternal = async function (context, name) {
   });
 };
 
-exports.transferNameLock = async function (context, name) {
-  const privateKey = secp256k1.privateKeyGenerate();
+exports.transferNameLock = async function (context, name, privateKeyOverride) {
+  const privateKey = privateKeyOverride || secp256k1.privateKeyGenerate();
   const publicKey = secp256k1.publicKeyCreate(privateKey);
   const lockScript = createLockScript(publicKey);
   const lockScriptAddr = new Address().fromScript(lockScript);
