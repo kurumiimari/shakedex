@@ -1,6 +1,6 @@
 {
   "name": "shakedex",
-  "version": "0.0.15",
+  "version": "0.0.16",
   "description": "A decentralized exchange for Handshake names.",
   "main": "src/cli/index.js",
   "bin": {
@@ -28,8 +28,6 @@
     "cli-table3": "0.6.0",
     "commander": "7.0.0",
     "date-fns": "2.17.0",
-    "hs-client": "0.0.9",
-    "hsd": "https://github.com/handshake-org/hsd/tarball/a94ce87",
     "inquirer": "7.3.3",
     "level": "6.0.1",
     "node-fetch": "2.6.1",
@@ -41,5 +39,9 @@
     "mocha": "8.2.1",
     "mock-stdin": "1.0.0",
     "prettier": "2.2.1"
+  },
+  "peerDependencies": {
+    "hs-client": "0.0.10",
+    "hsd": "3.0.1"
   }
 }
