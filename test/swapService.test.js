@@ -233,7 +233,7 @@ describe('proposeSwap', () => {
   });
 
   it('should be invalid when the locktime changes', () => {
-    proposedSwap.lockTime = 100;
+    proposedSwap.lockTime = Math.floor(Date.now() / 1000);
     return assert.becomes(proposedSwap.verify(alice), false);
   });
 

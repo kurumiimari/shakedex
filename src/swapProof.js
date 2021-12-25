@@ -82,7 +82,7 @@ class SwapProof {
       })
     );
 
-    mtx.locktime = this.lockTime;
+    mtx.setLocktime(this.lockTime, true)
 
     const lockScript = createLockScript(this.publicKey);
     if (this.signature) {
