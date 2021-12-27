@@ -456,7 +456,7 @@ async function publishAuction(auctionFile) {
   }
 
   const {opts, context} = await setupCLI();
-  const readStream = await fs.createReadStream(auctionFile);
+  const readStream = await fs.readFileSync(auctionFile);
   const auction = await Auction.fromStream(readStream);
 
   try {
@@ -834,7 +834,7 @@ async function fillAuction(auctionPath) {
   }
 
   const {db, context} = await setupCLI();
-  const readStream = await fs.createReadStream(auctionPath);
+  const readStream = await fs.readFileSync(auctionPath);
   const auction = await Auction.fromStream(readStream);
 
   log('Verifying swap proofs.');

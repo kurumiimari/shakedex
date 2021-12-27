@@ -109,13 +109,13 @@ describe('Auction', () => {
       await auction.writeToStream(alice, stream);
 
       const data = (await fs.promises.readFile(auctionPath)).toString('utf-8');
-      const lines = data.split('\n');
-      assert.equal(lines[0], 'SHAKEDEX_PROOF:1.0.0');
-      const auctionJSON = JSON.parse(lines.slice(1).join('\n'));
+      const auctionJSON = JSON.parse(data);
+      assert.equal(auctionJSON.version, 2);
       const swap1JSON = proposedSwap1.toJSON(alice);
       const swap2JSON = proposedSwap2.toJSON(alice);
 
       assert.deepStrictEqual(auctionJSON, {
+        version: 2,
         name,
         lockingTxHash: swap1JSON.lockingTxHash,
         lockingOutputIdx: swap1JSON.lockingOutputIdx,
@@ -142,12 +142,13 @@ describe('Auction', () => {
 
   describe('deserialization', () => {
     it('should deserialize proof files with no fees defined', async () => {
-      const stream = fs.createReadStream(
-        path.join(__dirname, 'fixtures', 'proof_no_fee.txt')
+      const stream = fs.readFileSync(
+        path.join(__dirname, 'fixtures', 'proof_no_fee.json')
       );
       const auction = await Auction.fromStream(stream);
 
       assert.deepStrictEqual(auction.toJSON(alice), {
+        version: 2,
         name: 'cliqy',
         lockingTxHash:
           'a5a9e2732cfb7156cdfda59a73d11ed1c871628281d467313fdf580695999e08',
@@ -176,12 +177,13 @@ describe('Auction', () => {
     });
 
     it('should deserialize proof files with fees defined', async () => {
-      const stream = fs.createReadStream(
-        path.join(__dirname, 'fixtures', 'proof_with_fee.txt')
+      const stream = fs.readFileSync(
+        path.join(__dirname, 'fixtures', 'proof_with_fee.json')
       );
       const auction = await Auction.fromStream(stream);
 
       assert.deepStrictEqual(auction.toJSON(alice), {
+        version: 2,
         name: 'cakcp',
         lockingTxHash:
           '0fe156590b5925919ccffb4f732b704d4e0ff37c78f15b24b65d39423559102f',
@@ -207,6 +209,91 @@ describe('Auction', () => {
           },
         ],
       });
+    });
+
+    it('should reject invalid proof: deprecated', async () => {
+      const stream = fs.readFileSync(
+        path.join(__dirname, 'fixtures', 'proof_with_fee-deprecated.txt')
+      );
+      let err;
+      try {
+        await Auction.fromStream(stream);
+      } catch(e) {
+        err = e;
+      }
+      assert(err);
+      assert.strictEqual(
+        err.message,
+        'Invalid proof: Proof file must be valid JSON.'
+      );
+    });
+      
+    it('should reject invalid proof: deprecated', async () => {
+      const stream = fs.readFileSync(
+        path.join(__dirname, 'fixtures', 'proof_no_fee-deprecated.txt')
+      );
+      let err;
+      try {
+        await Auction.fromStream(stream);
+      } catch(e) {
+        err = e;
+      }
+      assert(err);
+      assert.strictEqual(
+        err.message,
+        'Invalid proof: Proof file must be valid JSON.'
+      );
+    });
+
+    it('should reject invalid proof: version string', async () => {
+      const stream = {
+        version: '1.0.0'
+      }
+      let err;
+      try {
+        await Auction.fromStream(JSON.stringify(stream));
+      } catch(e) {
+        err = e;
+      }
+      assert(err);
+      assert.strictEqual(
+        err.message,
+        'Invalid proof: Proof version must be a number.'
+      );
+    });
+
+    it('should reject invalid proof: no version', async () => {
+      const stream = {
+        SHAKEDEX_PROOF: 2
+      }
+      let err;
+      try {
+        await Auction.fromStream(JSON.stringify(stream));
+      } catch(e) {
+        err = e;
+      }
+      assert(err);
+      assert.strictEqual(
+        err.message,
+        'Invalid proof: Proof version missing.'
+      );
+    });
+
+    it('should reject invalid proof: unsupported', async () => {
+      const stream = {
+        version: 1
+      }
+      let err;
+      try {
+        await Auction.fromStream(JSON.stringify(stream));
+      } catch(e) {
+        err = e;
+      }
+      assert(err);
+      assert.strictEqual(
+        err.message,
+        'Invalid proof: Unsupported proof version.'
+      );
     });
   });
 });

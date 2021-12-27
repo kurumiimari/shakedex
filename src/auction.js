@@ -4,6 +4,9 @@ const { coerceBuffer } = require('./conversions.js');
 const assert = require('assert').strict;
 const readline = require('readline');
 
+const CURRENT_PROTOCOL_VERSION = 2;
+const MINIMUM_PROTOCOL_VERSION = 2;
+
 function linearReductionStrategy(
   startTime,
   endTime,
@@ -118,7 +121,7 @@ class AuctionFactory {
     }
 
     return new Auction({
-      version: 'v1.0.0',
+      version: CURRENT_PROTOCOL_VERSION,
       name: lockFinalize.name,
       lockingTxHash: lockFinalize.finalizeTxHash,
       lockingOutputIdx: lockFinalize.finalizeOutputIdx,
@@ -156,8 +159,6 @@ class AuctionFactory {
 exports.AuctionFactory = AuctionFactory;
 
 class Auction {
-  static MAGIC = 'SHAKEDEX_PROOF';
-
   constructor(options) {
     const {
       name,
@@ -169,6 +170,7 @@ class Auction {
       feeAddr,
     } = options;
 
+    this.version = CURRENT_PROTOCOL_VERSION;
     this.name = name;
     this.lockingTxHash = coerceBuffer(lockingTxHash);
     this.lockingOutputIdx = lockingOutputIdx;
@@ -243,6 +245,7 @@ class Auction {
 
   toJSON(context) {
     return {
+      version: this.version,
       name: this.name,
       lockingTxHash: this.lockingTxHash.toString('hex'),
       lockingOutputIdx: this.lockingOutputIdx,
@@ -260,14 +263,6 @@ class Auction {
 
   async writeToStream(context, stream) {
     await new Promise((resolve, reject) =>
-      stream.write(`${Auction.MAGIC}:1.0.0\n`, (err) => {
-        if (err) {
-          return reject(err);
-        }
-        resolve();
-      })
-    );
-    await new Promise((resolve, reject) =>
       stream.write(JSON.stringify(this.toJSON(context)), (err) => {
         if (err) {
           return reject(err);
@@ -278,22 +273,26 @@ class Auction {
   }
 
   static async fromStream(input) {
-    const rl = readline.createInterface({
-      input,
-    });
-    const lines = [];
-    for await (const line of rl) {
-      lines.push(line);
-    }
-    await rl.close();
+    try {
+      const proofJSON = JSON.parse(input);
 
-    const firstLine = lines[0].trim();
-    if (firstLine !== `${Auction.MAGIC}:1.0.0`) {
-      throw new Error('Invalid proof file version.');
-    }
+      if (!proofJSON.version)
+        throw new Error('Proof version missing.');
 
-    const proofJSON = JSON.parse(lines.slice(1).join('\n'));
-    return new Auction(proofJSON);
+      if (typeof proofJSON.version !== 'number')
+        throw new Error('Proof version must be a number.');
+
+      if (proofJSON.version < MINIMUM_PROTOCOL_VERSION)
+        throw new Error('Unsupported proof version.');
+
+      return new Auction(proofJSON);
+    } catch (e) {
+      let message = e.message;
+      if (e.name === 'SyntaxError')
+        message = 'Proof file must be valid JSON.';
+
+      throw new Error(`Invalid proof: ${message}`);
+    }
   }
 }
 
