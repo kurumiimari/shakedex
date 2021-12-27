@@ -6,9 +6,7 @@ const { Context, staticPassphraseGetter } = require('../src/context.js');
 const { transferNameLock, finalizeNameLock } = require('../src/swapService.js');
 
 const network = Network.get('regtest');
-const hsdPath = path.resolve(
-  path.join(__dirname, '..', 'node_modules', 'hsd', 'bin', 'hsd')
-);
+const hsdPath = path.join(require.resolve('hsd'),  '..', '..', 'bin', 'hsd');
 
 let hsd;
 let nodeClient;
@@ -69,6 +67,7 @@ class LocalHSD extends HSD {
       '--network=regtest',
       `--api-key=${this.apiKey}`,
       '--log-level=debug',
+      '--memory=true'
     ]);
     hsd.stdout.on('data', (data) => {
       if (process.env.SILENCE_HSD) {
