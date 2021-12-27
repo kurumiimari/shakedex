@@ -3,6 +3,7 @@ const { setupSwap } = require('./hsd.js');
 const { linearReductionStrategy, Auction } = require('../src/auction.js');
 const { assert } = require('chai');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const { generateAddress } = require('./hsd.js');
 const { AuctionFactory } = require('../src/auction.js');
@@ -56,7 +57,11 @@ describe('Auction', () => {
     let proposedSwap2;
     let auction;
 
+    const tmpdir = path.join(os.tmpdir(), `shakedex-${Date.now()}`);
+
     beforeEach(async () => {
+      await fs.mkdirSync(tmpdir);
+
       alice = setupRes.alice;
       name = setupRes.name;
       feeAddr = (await generateAddress(setupRes.charlie.walletId)).address;
@@ -104,7 +109,8 @@ describe('Auction', () => {
     });
 
     it('should write a valid proof file', async () => {
-      const auctionPath = `/tmp/proof-${Date.now()}`;
+      const fileName = auction.fileName;
+      const auctionPath = path.join(tmpdir, fileName);
       const stream = fs.createWriteStream(auctionPath);
       await auction.writeToStream(alice, stream);
 

@@ -203,6 +203,13 @@ class Auction {
     return currentBid;
   }
 
+  get fileName() {
+    return 'auction-' +
+           `${this.name}-` +
+           this.lockingTxHash.toString('hex').slice(0,8) +
+           '.json';
+  }
+
   toSwapProof(idx) {
     assert(idx < this.data.length);
     assert(idx >= 0);
