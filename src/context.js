@@ -48,6 +48,16 @@ class Context {
     }
     await this.wallet.unlock(pass, 60);
   };
+
+  getMTP = async () => {
+    const info = await this.execNode('getblockchaininfo');
+    return info.mediantime;
+  };
+
+  getHeight = async () => {
+    const info = await this.execNode('getblockchaininfo');
+    return info.blocks;
+  };
 }
 
 exports.Context = Context;

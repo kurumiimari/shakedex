@@ -410,7 +410,7 @@ async function createAuction(name) {
       finalizeTxHash: confirmation.finalizeTxHash,
       finalizeOutputIdx: confirmation.finalizeOutputIdx,
       privateKey: extTransfer.privateKey,
-      broadcastAt: confirmation.confirmedAt,
+      broadcastAt: confirmation.confirmedAt * 1000,
     });
   } else {
     const finalizeJSON = await db.getLockFinalize(name);
@@ -535,19 +535,19 @@ async function promptAuctionParameters(db, context, finalize, shakedexWebHost) {
     die('Your start price cannot be less than your end price.');
   }
 
-  let reductionTimeMS;
+  let reductionTime;
   switch (decrementInterval) {
     case 'Every 15 minutes':
-      reductionTimeMS = 15 * 60 * 1000;
+      reductionTime = 15 * 60;
       break;
     case 'Every 30 minutes':
-      reductionTimeMS = 30 * 60 * 1000;
+      reductionTime = 30 * 60;
       break;
     case 'Hourly':
-      reductionTimeMS = 60 * 60 * 1000;
+      reductionTime = 60 * 60;
       break;
     case 'Daily':
-      reductionTimeMS = 24 * 60 * 60 * 1000;
+      reductionTime = 24 * 60 * 60;
   }
 
   let outPath = answers.outPath;
@@ -580,13 +580,14 @@ async function promptAuctionParameters(db, context, finalize, shakedexWebHost) {
     }
   }
 
+  const mtp = await context.getMTP();
   const auctionFactory = new AuctionFactory({
     name,
-    startTime: Date.now(),
-    endTime: Date.now() + durationDays * 24 * 60 * 60 * 1000,
+    startTime: mtp,
+    endTime: mtp + durationDays * 24 * 60 * 60,
     startPrice: startPrice * 1e6,
     endPrice: endPrice * 1e6,
-    reductionTimeMS,
+    reductionTime,
     reductionStrategy: linearReductionStrategy,
     feeRate: feeInfo.rate,
     feeAddr: feeInfo.addr,
@@ -851,7 +852,11 @@ async function fillAuction(auctionPath) {
   log('All swap proofs in auction are valid.');
 
   log('Calculating best price.');
-  const [bestBid, bestProofIdx] = auction.bestBidAt(Date.now());
+
+  const [bestBid, bestProofIdx] = await auction.bestBidAt(context);
+
+  if (!bestBid)
+    die('No proofs are mature yet, auction has not started.');
 
   const table = new Table();
   table.push(
@@ -952,7 +957,7 @@ async function listFills() {
           (fill.fee / 1e6).toFixed(6),
           format(new Date(fill.broadcastAt), 'MM/dd/yyyy HH:MM:SS'),
           confirmation.confirmedAt
-            ? format(new Date(confirmation.confirmedAt), 'MM/dd/yyyy HH:MM:SS')
+            ? format(new Date(confirmation.confirmedAt * 1000), 'MM/dd/yyyy HH:MM:SS')
             : '-',
         ]);
         break;

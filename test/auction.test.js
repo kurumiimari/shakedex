@@ -10,7 +10,7 @@ const { AuctionFactory } = require('../src/auction.js');
 
 describe('linearAuctionStrategy', () => {
   it('should generate prices and lock times linearly', () => {
-    const ONE_DAY = 24 * 60 * 60 * 1000;
+    const ONE_DAY = 24 * 60 * 60 ;
     const ONE_WEEK = 7 * ONE_DAY;
 
     const strategy = linearReductionStrategy(
@@ -319,14 +319,15 @@ describe('AuctionFactory', () => {
     finalizeLock = setupRes.finalizeLock;
     feeAddr = (await generateAddress(charlie.walletId)).address;
 
+    const mtp = await alice.getMTP();
     auctionFactory = new AuctionFactory({
       name: 'test',
       reductionStrategy: 'LINEAR',
-      startTime: Date.now(),
-      endTime: Date.now() + 86400000,
+      startTime: mtp,
+      endTime: mtp + (60 * 60 * 24),  // one day
       startPrice: 10000000,
       endPrice: 1000000,
-      reductionTimeMS: 3600000,
+      reductionTime: 3600000,
       feeRate: 100,
       feeAddr,
     });

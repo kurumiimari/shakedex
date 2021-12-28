@@ -12,9 +12,9 @@ function linearReductionStrategy(
   endTime,
   startPrice,
   endPrice,
-  reductionTimeMs
+  reductionTime
 ) {
-  const stepCount = Math.floor((endTime - startTime) / reductionTimeMs);
+  const stepCount = Math.floor((endTime - startTime) / reductionTime);
   const priceDecrement = Math.floor((startPrice - endPrice) / (stepCount - 1));
   let currStep = 0;
 
@@ -25,7 +25,7 @@ function linearReductionStrategy(
 
     const res = {
       price: startPrice - priceDecrement * currStep,
-      lockTime: Math.floor((startTime + reductionTimeMs * currStep) / 1000),
+      lockTime: startTime + reductionTime * currStep,
     };
     currStep++;
     return res;
@@ -44,7 +44,7 @@ class AuctionFactory {
       endTime,
       startPrice,
       endPrice,
-      reductionTimeMS,
+      reductionTime,
       feeRate,
       feeAddr,
     } = options;
@@ -56,8 +56,8 @@ class AuctionFactory {
     assert(typeof startPrice === 'number');
     assert(typeof endPrice === 'number');
     assert(endPrice > 0 && startPrice > endPrice);
-    assert(typeof reductionTimeMS === 'number');
-    assert(reductionTimeMS > 0);
+    assert(typeof reductionTime === 'number');
+    assert(reductionTime > 0);
     assert(typeof feeRate === 'number' && feeRate >= 0 && feeRate <= 10000);
     if (feeRate > 0 && !feeAddr) {
       throw new Error('Must specify a fee address if feeRate > 0.');
@@ -82,7 +82,7 @@ class AuctionFactory {
     this.endTime = endTime;
     this.startPrice = startPrice;
     this.endPrice = endPrice;
-    this.reductionTimeMS = reductionTimeMS;
+    this.reductionTime = reductionTime;
     this.reductionStrategy = reductionStrategy;
     this.feeRate = feeRate;
     this.feeAddr = feeAddr ? coerceAddress(feeAddr) : null;
@@ -138,7 +138,7 @@ class AuctionFactory {
       this.endTime,
       this.startPrice,
       this.endPrice,
-      this.reductionTimeMS
+      this.reductionTime
     );
   }
 
@@ -149,7 +149,7 @@ class AuctionFactory {
       endTime: this.endTime,
       startPrice: this.startPrice,
       endPrice: this.endPrice,
-      reductionTimeMS: this.reductionTimeMS,
+      reductionTime: this.reductionTime,
       reductionStrategy: this.reductionStrategy.name,
       feeAddr: this.feeAddr ? this.feeAddr.toString(context.networkName) : null,
     };
@@ -191,16 +191,24 @@ class Auction {
     this.data.sort((a, b) => b.price - a.price);
   }
 
-  bestBidAt(ts) {
-    let currentBid = null;
+  async bestBidAt(context) {
+    const mtp = await context.getMTP();
+    const height = await context.getHeight();
+
     for (let i = 0; i < this.data.length; i++) {
-      const datum = this.data[i];
-      if (datum.lockTime > ts) {
-        break;
-      }
-      currentBid = [datum, i];
+      const proof = this.toSwapProof(i);
+      const mtx = await proof.toMTX(context);
+
+      // Let hsd parse the locktime value: in Handshake,
+      // the tx.locktime U32 in the serialized TX is NOT A LITERAL TIMESTAMP.
+      // This is very different from Bitcoin!
+      // See the complete, detailed Handshake protocol specification at: // TODO
+      // Height should not matter but we include it for
+      // potential forwards-compatability.
+      if (mtx.isFinal(height, mtp))
+        return [this.data[i], i];
     }
-    return currentBid;
+    return [null, null];
   }
 
   get fileName() {
