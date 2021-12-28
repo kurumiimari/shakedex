@@ -126,6 +126,11 @@ program
   .action(finalizeAuction);
 
 program
+  .command('inspect-auction <auctionPath>')
+  .description('Decode proofs file and display auction information.')
+  .action(inspectAuction);
+
+program
   .command('list-fills')
   .description('Prints all of your fills and their statuses.')
   .action(listFills);
@@ -911,6 +916,61 @@ async function finalizeAuction(name) {
 
   const finalize = await finalizeSwap(context, fill);
   await db.putSwapFinalize(finalize);
+}
+
+async function inspectAuction(auctionPath) {
+  const exists = fs.existsSync(auctionPath);
+  if (!exists) {
+    die(`Proposals file not found.`);
+  }
+
+  const {db, context} = await setupCLI();
+  const readStream = await fs.readFileSync(auctionPath);
+  const auction = await Auction.fromStream(readStream);
+
+  log('Verifying swap proofs.');
+  const ok = await auction.verifyProofs(context, (curr, total) => {
+    process.stdout.clearLine();
+    process.stdout.cursorTo(0);
+    process.stdout.write(`>> Verified proof ${curr}.`);
+  });
+  process.stdout.clearLine();
+  process.stdout.cursorTo(0);
+  if (!ok) {
+    die('Auction contains invalid swap proofs.');
+  }
+  log('All swap proofs in auction are valid.');
+
+  const [bestBid, bestProofIdx] = await auction.bestBidAt(context);
+
+    const table = new Table({
+    head: [
+      'Name',
+      'Price (HNS)',
+      'Fee',
+      'Locktime (MTP)',
+      'Current Best'
+    ],
+  });
+  for (let i = 0; i < auction.data.length; i++) {
+    const bid = auction.toSwapProof(i);
+    table.push([
+      bid.name,
+      (bid.price / 1e6).toFixed(6),
+      bid.fee,
+      format(new Date(bid.lockTime * 1000), 'MM/dd/yyyy HH:MM:SS'),
+      i === bestProofIdx ? '<--------' : ''
+    ]);
+  }
+  process.stdout.write(table.toString());
+  process.stdout.write('\n');
+
+  const mtp = await context.getMTP();
+  const now = format(new Date(mtp * 1000), 'MM/dd/yyyy HH:MM:SS');
+  log(`Current time (MTP): ${now}`);
+
+  if (!bestBid)
+    die('No proofs are mature yet, auction has not started.');
 }
 
 async function listFills() {
