@@ -195,7 +195,7 @@ class Auction {
     const mtp = await context.getMTP();
     const height = await context.getHeight();
 
-    for (let i = 0; i < this.data.length; i++) {
+    for (let i = this.data.length-1; i >= 0; i--) {
       const proof = this.toSwapProof(i);
       const mtx = await proof.toMTX(context);
 
