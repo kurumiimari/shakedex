@@ -126,6 +126,11 @@ program
   .action(finalizeAuction);
 
 program
+  .command('inspect-auction <auctionPath>')
+  .description('Decode proofs file and display auction information.')
+  .action(inspectAuction);
+
+program
   .command('list-fills')
   .description('Prints all of your fills and their statuses.')
   .action(listFills);
@@ -410,7 +415,7 @@ async function createAuction(name) {
       finalizeTxHash: confirmation.finalizeTxHash,
       finalizeOutputIdx: confirmation.finalizeOutputIdx,
       privateKey: extTransfer.privateKey,
-      broadcastAt: confirmation.confirmedAt,
+      broadcastAt: confirmation.confirmedAt * 1000,
     });
   } else {
     const finalizeJSON = await db.getLockFinalize(name);
@@ -456,7 +461,7 @@ async function publishAuction(auctionFile) {
   }
 
   const {opts, context} = await setupCLI();
-  const readStream = await fs.createReadStream(auctionFile);
+  const readStream = await fs.readFileSync(auctionFile);
   const auction = await Auction.fromStream(readStream);
 
   try {
@@ -535,19 +540,19 @@ async function promptAuctionParameters(db, context, finalize, shakedexWebHost) {
     die('Your start price cannot be less than your end price.');
   }
 
-  let reductionTimeMS;
+  let reductionTime;
   switch (decrementInterval) {
     case 'Every 15 minutes':
-      reductionTimeMS = 15 * 60 * 1000;
+      reductionTime = 15 * 60;
       break;
     case 'Every 30 minutes':
-      reductionTimeMS = 30 * 60 * 1000;
+      reductionTime = 30 * 60;
       break;
     case 'Hourly':
-      reductionTimeMS = 60 * 60 * 1000;
+      reductionTime = 60 * 60;
       break;
     case 'Daily':
-      reductionTimeMS = 24 * 60 * 60 * 1000;
+      reductionTime = 24 * 60 * 60;
   }
 
   let outPath = answers.outPath;
@@ -580,13 +585,14 @@ async function promptAuctionParameters(db, context, finalize, shakedexWebHost) {
     }
   }
 
+  const mtp = await context.getMTP();
   const auctionFactory = new AuctionFactory({
     name,
-    startTime: Date.now(),
-    endTime: Date.now() + durationDays * 24 * 60 * 60 * 1000,
+    startTime: mtp,
+    endTime: mtp + durationDays * 24 * 60 * 60,
     startPrice: startPrice * 1e6,
     endPrice: endPrice * 1e6,
-    reductionTimeMS,
+    reductionTime,
     reductionStrategy: linearReductionStrategy,
     feeRate: feeInfo.rate,
     feeAddr: feeInfo.addr,
@@ -834,7 +840,7 @@ async function fillAuction(auctionPath) {
   }
 
   const {db, context} = await setupCLI();
-  const readStream = await fs.createReadStream(auctionPath);
+  const readStream = await fs.readFileSync(auctionPath);
   const auction = await Auction.fromStream(readStream);
 
   log('Verifying swap proofs.');
@@ -851,7 +857,11 @@ async function fillAuction(auctionPath) {
   log('All swap proofs in auction are valid.');
 
   log('Calculating best price.');
-  const [bestBid, bestProofIdx] = auction.bestBidAt(Date.now());
+
+  const [bestBid, bestProofIdx] = await auction.bestBidAt(context);
+
+  if (!bestBid)
+    die('No proofs are mature yet, auction has not started.');
 
   const table = new Table();
   table.push(
@@ -908,6 +918,61 @@ async function finalizeAuction(name) {
   await db.putSwapFinalize(finalize);
 }
 
+async function inspectAuction(auctionPath) {
+  const exists = fs.existsSync(auctionPath);
+  if (!exists) {
+    die(`Proposals file not found.`);
+  }
+
+  const {db, context} = await setupCLI();
+  const readStream = await fs.readFileSync(auctionPath);
+  const auction = await Auction.fromStream(readStream);
+
+  log('Verifying swap proofs.');
+  const ok = await auction.verifyProofs(context, (curr, total) => {
+    process.stdout.clearLine();
+    process.stdout.cursorTo(0);
+    process.stdout.write(`>> Verified proof ${curr}.`);
+  });
+  process.stdout.clearLine();
+  process.stdout.cursorTo(0);
+  if (!ok) {
+    die('Auction contains invalid swap proofs.');
+  }
+  log('All swap proofs in auction are valid.');
+
+  const [bestBid, bestProofIdx] = await auction.bestBidAt(context);
+
+    const table = new Table({
+    head: [
+      'Name',
+      'Price (HNS)',
+      'Fee',
+      'Locktime (MTP)',
+      'Current Best'
+    ],
+  });
+  for (let i = 0; i < auction.data.length; i++) {
+    const bid = auction.toSwapProof(i);
+    table.push([
+      bid.name,
+      (bid.price / 1e6).toFixed(6),
+      bid.fee,
+      format(new Date(bid.lockTime * 1000), 'MM/dd/yyyy HH:MM:SS'),
+      i === bestProofIdx ? '<--------' : ''
+    ]);
+  }
+  process.stdout.write(table.toString());
+  process.stdout.write('\n');
+
+  const mtp = await context.getMTP();
+  const now = format(new Date(mtp * 1000), 'MM/dd/yyyy HH:MM:SS');
+  log(`Current time (MTP): ${now}`);
+
+  if (!bestBid)
+    die('No proofs are mature yet, auction has not started.');
+}
+
 async function listFills() {
   const {db, context} = await setupCLI();
 
@@ -952,7 +1017,7 @@ async function listFills() {
           (fill.fee / 1e6).toFixed(6),
           format(new Date(fill.broadcastAt), 'MM/dd/yyyy HH:MM:SS'),
           confirmation.confirmedAt
-            ? format(new Date(confirmation.confirmedAt), 'MM/dd/yyyy HH:MM:SS')
+            ? format(new Date(confirmation.confirmedAt * 1000), 'MM/dd/yyyy HH:MM:SS')
             : '-',
         ]);
         break;

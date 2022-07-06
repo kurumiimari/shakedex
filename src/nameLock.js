@@ -44,7 +44,7 @@ class NameLockTransfer {
     const transferLockup = networks[context.networkName].names.transferLockup;
     const included = tx && tx.height > -1;
     return {
-      confirmedAt: included ? tx.mtime * 1000 : null,
+      confirmedAt: included ? tx.mtime : null,
       spendable: included ? info.blocks - tx.height > transferLockup : null,
       spendableIn: included
         ? Math.max(transferLockup - (info.blocks - tx.height), 0)
@@ -104,7 +104,7 @@ class NameLockFinalize {
     }
 
     return {
-      confirmedAt: tx.mtime * 1000,
+      confirmedAt: tx.mtime,
     };
   }
 
@@ -170,7 +170,7 @@ class NameLockExternalTransfer {
     }
 
     return {
-      confirmedAt: foundTx.mtime * 1000,
+      confirmedAt: foundTx.mtime,
       finalizeTxHash: foundTx.hash,
       finalizeOutputIdx: foundTxIdx,
       status: 'CONFIRMED',
@@ -230,7 +230,7 @@ class NameLockCancelTransfer {
     const info = await context.execNode('getblockchaininfo');
     const transferLockup = networks[context.networkName].names.transferLockup;
     return {
-      confirmedAt: tx.mtime * 1000,
+      confirmedAt: tx.mtime,
       spendable: info.blocks - tx.height > transferLockup,
       spendableIn: Math.max(transferLockup - (info.blocks - tx.height), 0),
     };
@@ -275,7 +275,7 @@ class NameLockCancelFinalize {
     }
 
     return {
-      confirmedAt: tx.mtime * 1000,
+      confirmedAt: tx.mtime,
     };
   }
 

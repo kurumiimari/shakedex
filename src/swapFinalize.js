@@ -11,7 +11,7 @@ class SwapFinalize {
     const tx = await context.nodeClient.getTX(this.finalizeTxHash);
     const included = tx.height > -1;
     return {
-      confirmedAt: included ? tx.mtime * 1000 : null,
+      confirmedAt: included ? tx.mtime : null,
     };
   }
 

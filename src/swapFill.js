@@ -37,7 +37,7 @@ class SwapFill {
     const transferLockup = networks[context.networkName].names.transferLockup;
     const included = tx && tx.height > -1;
     return {
-      confirmedAt: included ? tx.mtime * 1000 : null,
+      confirmedAt: included ? tx.mtime: null,
       spendable: included ? info.blocks - tx.height > transferLockup : null,
       spendableIn: included
         ? Math.max(transferLockup - (info.blocks - tx.height), 0)

@@ -49,7 +49,7 @@ describe('NameLockExternalTransfer', () => {
       const details = await extTransfer.getConfirmationDetails(alice);
       assert.deepStrictEqual(details, {
         status: 'CONFIRMED',
-        confirmedAt: finalizeTx.mtime * 1000,
+        confirmedAt: finalizeTx.mtime,
         finalizeTxHash: finalizeTx.hash,
         finalizeOutputIdx: 0,
       });

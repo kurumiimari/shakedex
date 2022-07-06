@@ -4,14 +4,17 @@ const { coerceBuffer } = require('./conversions.js');
 const assert = require('assert').strict;
 const readline = require('readline');
 
+const CURRENT_PROTOCOL_VERSION = 2;
+const MINIMUM_PROTOCOL_VERSION = 2;
+
 function linearReductionStrategy(
   startTime,
   endTime,
   startPrice,
   endPrice,
-  reductionTimeMs
+  reductionTime
 ) {
-  const stepCount = Math.floor((endTime - startTime) / reductionTimeMs);
+  const stepCount = Math.floor((endTime - startTime) / reductionTime);
   const priceDecrement = Math.floor((startPrice - endPrice) / (stepCount - 1));
   let currStep = 0;
 
@@ -22,7 +25,7 @@ function linearReductionStrategy(
 
     const res = {
       price: startPrice - priceDecrement * currStep,
-      lockTime: Math.floor((startTime + reductionTimeMs * currStep) / 1000),
+      lockTime: startTime + reductionTime * currStep,
     };
     currStep++;
     return res;
@@ -41,7 +44,7 @@ class AuctionFactory {
       endTime,
       startPrice,
       endPrice,
-      reductionTimeMS,
+      reductionTime,
       feeRate,
       feeAddr,
     } = options;
@@ -53,8 +56,8 @@ class AuctionFactory {
     assert(typeof startPrice === 'number');
     assert(typeof endPrice === 'number');
     assert(endPrice > 0 && startPrice > endPrice);
-    assert(typeof reductionTimeMS === 'number');
-    assert(reductionTimeMS > 0);
+    assert(typeof reductionTime === 'number');
+    assert(reductionTime > 0);
     assert(typeof feeRate === 'number' && feeRate >= 0 && feeRate <= 10000);
     if (feeRate > 0 && !feeAddr) {
       throw new Error('Must specify a fee address if feeRate > 0.');
@@ -79,7 +82,7 @@ class AuctionFactory {
     this.endTime = endTime;
     this.startPrice = startPrice;
     this.endPrice = endPrice;
-    this.reductionTimeMS = reductionTimeMS;
+    this.reductionTime = reductionTime;
     this.reductionStrategy = reductionStrategy;
     this.feeRate = feeRate;
     this.feeAddr = feeAddr ? coerceAddress(feeAddr) : null;
@@ -118,7 +121,7 @@ class AuctionFactory {
     }
 
     return new Auction({
-      version: 'v1.0.0',
+      version: CURRENT_PROTOCOL_VERSION,
       name: lockFinalize.name,
       lockingTxHash: lockFinalize.finalizeTxHash,
       lockingOutputIdx: lockFinalize.finalizeOutputIdx,
@@ -135,7 +138,7 @@ class AuctionFactory {
       this.endTime,
       this.startPrice,
       this.endPrice,
-      this.reductionTimeMS
+      this.reductionTime
     );
   }
 
@@ -146,7 +149,7 @@ class AuctionFactory {
       endTime: this.endTime,
       startPrice: this.startPrice,
       endPrice: this.endPrice,
-      reductionTimeMS: this.reductionTimeMS,
+      reductionTime: this.reductionTime,
       reductionStrategy: this.reductionStrategy.name,
       feeAddr: this.feeAddr ? this.feeAddr.toString(context.networkName) : null,
     };
@@ -156,8 +159,6 @@ class AuctionFactory {
 exports.AuctionFactory = AuctionFactory;
 
 class Auction {
-  static MAGIC = 'SHAKEDEX_PROOF';
-
   constructor(options) {
     const {
       name,
@@ -169,6 +170,7 @@ class Auction {
       feeAddr,
     } = options;
 
+    this.version = CURRENT_PROTOCOL_VERSION;
     this.name = name;
     this.lockingTxHash = coerceBuffer(lockingTxHash);
     this.lockingOutputIdx = lockingOutputIdx;
@@ -189,16 +191,31 @@ class Auction {
     this.data.sort((a, b) => b.price - a.price);
   }
 
-  bestBidAt(ts) {
-    let currentBid = null;
+  async bestBidAt(context) {
+    const mtp = await context.getMTP();
+    const height = await context.getHeight();
+
     for (let i = 0; i < this.data.length; i++) {
-      const datum = this.data[i];
-      if (datum.lockTime > ts) {
-        break;
-      }
-      currentBid = [datum, i];
+      const proof = this.toSwapProof(i);
+      const mtx = await proof.toMTX(context);
+
+      // Let hsd parse the locktime value: in Handshake,
+      // the tx.locktime U32 in the serialized TX is NOT A LITERAL TIMESTAMP.
+      // This is very different from Bitcoin!
+      // See the complete, detailed Handshake protocol specification at: // TODO
+      // Height should not matter but we include it for
+      // potential forwards-compatability.
+      if (mtx.isFinal(height, mtp))
+        return [this.data[i], i];
     }
-    return currentBid;
+    return [null, null];
+  }
+
+  get fileName() {
+    return 'auction-' +
+           `${this.name}-` +
+           this.lockingTxHash.toString('hex').slice(0,8) +
+           '.json';
   }
 
   toSwapProof(idx) {
@@ -243,6 +260,7 @@ class Auction {
 
   toJSON(context) {
     return {
+      version: this.version,
       name: this.name,
       lockingTxHash: this.lockingTxHash.toString('hex'),
       lockingOutputIdx: this.lockingOutputIdx,
@@ -260,14 +278,6 @@ class Auction {
 
   async writeToStream(context, stream) {
     await new Promise((resolve, reject) =>
-      stream.write(`${Auction.MAGIC}:1.0.0\n`, (err) => {
-        if (err) {
-          return reject(err);
-        }
-        resolve();
-      })
-    );
-    await new Promise((resolve, reject) =>
       stream.write(JSON.stringify(this.toJSON(context)), (err) => {
         if (err) {
           return reject(err);
@@ -278,22 +288,26 @@ class Auction {
   }
 
   static async fromStream(input) {
-    const rl = readline.createInterface({
-      input,
-    });
-    const lines = [];
-    for await (const line of rl) {
-      lines.push(line);
-    }
-    await rl.close();
+    try {
+      const proofJSON = JSON.parse(input);
 
-    const firstLine = lines[0].trim();
-    if (firstLine !== `${Auction.MAGIC}:1.0.0`) {
-      throw new Error('Invalid proof file version.');
-    }
+      if (!proofJSON.version)
+        throw new Error('Proof version missing.');
 
-    const proofJSON = JSON.parse(lines.slice(1).join('\n'));
-    return new Auction(proofJSON);
+      if (typeof proofJSON.version !== 'number')
+        throw new Error('Proof version must be a number.');
+
+      if (proofJSON.version < MINIMUM_PROTOCOL_VERSION)
+        throw new Error('Unsupported proof version.');
+
+      return new Auction(proofJSON);
+    } catch (e) {
+      let message = e.message;
+      if (e.name === 'SyntaxError')
+        message = 'Proof file must be valid JSON.';
+
+      throw new Error(`Invalid proof: ${message}`);
+    }
   }
 }
 
