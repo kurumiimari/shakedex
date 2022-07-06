@@ -1,6 +1,6 @@
 {
   "name": "shakedex",
-  "version": "0.0.17",
+  "version": "0.0.18",
   "description": "A decentralized exchange for Handshake names.",
   "main": "src/cli/index.js",
   "bin": {
@@ -39,9 +39,5 @@
     "mocha": "8.2.1",
     "mock-stdin": "1.0.0",
     "prettier": "2.2.1"
-  },
-  "peerDependencies": {
-    "hs-client": "0.0.10",
-    "hsd": "3.0.1"
   }
 }

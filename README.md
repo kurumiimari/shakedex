@@ -23,7 +23,8 @@ shakedex automates the above flow, and adds an auction layer on top. By creating
 
 To install shakedex:
 
-```
+```sh
+npm i -g hsd hs-client		# required
 npm i -g shakedex
 ```
 

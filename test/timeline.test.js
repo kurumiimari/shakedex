@@ -103,12 +103,24 @@ describe('Auction Timeline', () => {
     assert.strictEqual(bestProofIdx, 0);
   });
 
-  it('Filling any other bid is still currently invalid', async () => {
+  it('Advance 1 block', async () => {
+    await mineTime(1, alice);
+  });
+
+  it('The auction has now started: first 6 bids are available', async () => {
+    // with 6 blocks mined, the median time unlocks 6 bids
+    // the best bid is at index 5
+    const [bestBid, bestProofIdx] = await auction.bestBidAt(bob);
+    assert.strictEqual(bestBid.price, 79 * 1e6);
+    assert.strictEqual(bestProofIdx, 5);
+  });
+
+  it('Filling other bids is still currently invalid', async () => {
     // Mempool is empty
     const mempool = await bob.execNode('getrawmempool');
     assert.strictEqual(mempool.length, 0);
 
-    for (let i = 1; i < auction.data.length; i++) {
+    for (let i = 6; i < auction.data.length; i++) {
       const proof = auction.toSwapProof(i);
 
       // This is Bob trying to cheat and fill a cheap bid
