@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.18] - 2022-07-06
+### Added
+
+- Added a new command `inspect-auction` that verifies proof files and displays bids
+
+### Changed
+
+- Changed the auction file format to include version and not require a magic string header
+- Changed the minimum auction file version to 2
+- Changed milliseconds to seconds for locktime to be consistent with hsd
+- Changed to verify bids against blockchain time instead of OS clock time
+
+## [0.0.17] - 2021-12-25
+### Fixed
+
+- Fixed a bug where locktime was not set correctly when creating proofs
+
 ## [0.0.16] - 2021-10-23
 ### Added
 
@@ -42,7 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Fixed an off-by-one in `linearReductionStrategy`. Closes #16. H/T @brefranz for reporting. 
+- Fixed an off-by-one in `linearReductionStrategy`. Closes #16. H/T @brefranz for reporting.
 
 ## [0.0.10] - 2021-03-13
 ### Added
@@ -95,7 +112,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.0.3] - 2021-02-19
 ### Added
 
-- Added an option to `Context` to support custom HSD hosts. 
+- Added an option to `Context` to support custom HSD hosts.
 
 ## [0.0.2] - 2021-02-13
 ### Added
