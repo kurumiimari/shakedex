@@ -1,4 +1,4 @@
-const { NodeClient, WalletClient } = require('hs-client');
+const { NodeClient, WalletClient } = require('hsd/lib/client');
 const Network = require('hsd/lib/protocol/network.js');
 const passwordPrompt = require('password-prompt');
 
