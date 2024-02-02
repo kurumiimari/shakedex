@@ -1,6 +1,6 @@
 const { spawn } = require('child_process');
 const path = require('path');
-const { NodeClient, WalletClient } = require('hs-client');
+const { NodeClient, WalletClient } = require('hsd/lib/client');
 const Network = require('hsd/lib/protocol/network.js');
 const { Context, staticPassphraseGetter } = require('../src/context.js');
 const { transferNameLock, finalizeNameLock } = require('../src/swapService.js');
